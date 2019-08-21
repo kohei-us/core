@@ -411,11 +411,6 @@ bool ScXMLSourceDlg::IsParentDirty(weld::TreeIter* pEntry) const
             // This parent is already linked.
             return true;
         }
-        if (pUserData->meType == ScOrcusXMLTreeParam::ElementRepeat)
-        {
-            // This is a repeat element.
-            return true;
-        }
     }
     while (mxLbTree->iter_parent(*xParent));
     return false;

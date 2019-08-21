@@ -460,9 +460,14 @@ void getFieldLinks(
         OUString aPath = getXPath(rTree, *xChild, rNamespaces);
         const ScOrcusXMLTreeParam::EntryData* pUserData = ScOrcusXMLTreeParam::getUserData(rTree, *xChild);
 
-        if (pUserData && pUserData->mbLeafNode)
+        if (pUserData)
         {
-            if (!aPath.isEmpty())
+            if (pUserData->meType == ScOrcusXMLTreeParam::ElementRepeat)
+                // nested repeat element automatically becomes a row-group node.
+                rRangeLink.maRowGroups.push_back(
+                    OUStringToOString(aPath, RTL_TEXTENCODING_UTF8));
+
+            if (pUserData->mbLeafNode && !aPath.isEmpty())
                 // XPath should never be empty anyway, but it won't hurt to check...
                 rRangeLink.maFieldPaths.push_back(OUStringToOString(aPath, RTL_TEXTENCODING_UTF8));
         }
@@ -515,8 +520,8 @@ void ScXMLSourceDlg::OkPressed()
             // Go through all its child elements.
             getFieldLinks(aRangeLink, aParam.maNamespaces, *mxLbTree, *rEntry);
 
-            // Add the anchor node as a grouping node, which will be used as a
-            // row position increment point.
+            // Add the reference entry as a row-group node, which will be used
+            // as a row position increment point.
             OUString aThisEntry = getXPath(*mxLbTree, *rEntry, aParam.maNamespaces);
             aRangeLink.maRowGroups.push_back(
                 OUStringToOString(aThisEntry, RTL_TEXTENCODING_UTF8));

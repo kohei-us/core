@@ -1886,6 +1886,7 @@ void ScOrcusStyles::applyXfToItemSet(SfxItemSet& rSet, size_t xfId)
 
 os::iface::import_font_style* ScOrcusStyles::start_font_style()
 {
+    maFontStyle.reset();
     return &maFontStyle;
 }
 

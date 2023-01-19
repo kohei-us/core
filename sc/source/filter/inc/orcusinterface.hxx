@@ -24,6 +24,7 @@
 #include <editeng/borderline.hxx>
 
 #include <orcus/spreadsheet/import_interface.hpp>
+#include <orcus/spreadsheet/import_interface_styles.hpp>
 
 #include <memory>
 #include <map>
@@ -216,9 +217,13 @@ public:
     ScOrcusSheetProperties(SCTAB nTab, ScDocumentImport& rDoc);
     virtual ~ScOrcusSheetProperties() override;
 
-    virtual void set_column_width(orcus::spreadsheet::col_t col, double width, orcus::length_unit_t unit) override;
+    virtual void set_column_width(
+        orcus::spreadsheet::col_t col, orcus::spreadsheet::col_t col_span,
+        double width, orcus::length_unit_t unit) override;
 
-    virtual void set_column_hidden(orcus::spreadsheet::col_t col, bool hidden) override;
+    virtual void set_column_hidden(
+        orcus::spreadsheet::col_t col, orcus::spreadsheet::col_t col_span,
+        bool hidden) override;
 
     virtual void set_row_height(orcus::spreadsheet::row_t row, double height, orcus::length_unit_t unit) override;
 
@@ -336,6 +341,9 @@ public:
     virtual void set_format(orcus::spreadsheet::row_t row, orcus::spreadsheet::col_t col, size_t xf_index) override;
     virtual void set_format(orcus::spreadsheet::row_t row_start, orcus::spreadsheet::col_t col_start,
             orcus::spreadsheet::row_t row_end, orcus::spreadsheet::col_t col_end, size_t xf_index) override;
+    virtual void set_column_format(
+        orcus::spreadsheet::col_t col, orcus::spreadsheet::col_t col_span, std::size_t xf_index) override;
+    virtual void set_row_format(orcus::spreadsheet::row_t row, std::size_t xf_index) override;
 
     virtual orcus::spreadsheet::range_size_t get_sheet_size() const override;
 
@@ -348,27 +356,80 @@ public:
     ScOrcusFactory& getFactory();
 };
 
+struct ScOrcusFont
+{
+    std::optional<OUString> maName;
+    std::optional<OUString> maNameAsian;
+    std::optional<OUString> maNameComplex;
+    std::optional<double> mnSize;
+    std::optional<double> mnSizeAsian;
+    std::optional<double> mnSizeComplex;
+    std::optional<Color> maColor;
+    std::optional<bool> mbBold;
+    std::optional<bool> mbBoldAsian;
+    std::optional<bool> mbBoldComplex;
+    std::optional<bool> mbItalic;
+    std::optional<bool> mbItalicAsian;
+    std::optional<bool> mbItalicComplex;
+    std::optional<FontLineStyle> meUnderline;
+    std::optional<Color> maUnderlineColor;
+    std::optional<FontStrikeout> meStrikeout;
+
+    void applyToItemSet( SfxItemSet& rSet ) const;
+};
+
+class ScOrcusFontStyle : public orcus::spreadsheet::iface::import_font_style
+{
+    ScOrcusFont maCurrentFont;
+    ScOrcusFactory& mrFactory;
+    std::vector<ScOrcusFont>& mrFonts;
+
+public:
+    ScOrcusFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts );
+
+    void reset();
+
+    void set_bold(bool b) override;
+    void set_bold_asian(bool b) override;
+    void set_bold_complex(bool b) override;
+    void set_italic(bool b) override;
+    void set_italic_asian(bool b) override;
+    void set_italic_complex(bool b) override;
+    void set_name(std::string_view s) override;
+    void set_name_asian(std::string_view s) override;
+    void set_name_complex(std::string_view s) override;
+    void set_size(double point) override;
+    void set_size_asian(double point) override;
+    void set_size_complex(double point) override;
+    void set_underline(orcus::spreadsheet::underline_t e) override;
+    void set_underline_width(orcus::spreadsheet::underline_width_t e) override;
+    void set_underline_mode(orcus::spreadsheet::underline_mode_t e) override;
+    void set_underline_type(orcus::spreadsheet::underline_type_t e) override;
+    void set_underline_color(
+        orcus::spreadsheet::color_elem_t alpha,
+        orcus::spreadsheet::color_elem_t red,
+        orcus::spreadsheet::color_elem_t green,
+        orcus::spreadsheet::color_elem_t blue) override;
+    void set_color(
+        orcus::spreadsheet::color_elem_t alpha,
+        orcus::spreadsheet::color_elem_t red,
+        orcus::spreadsheet::color_elem_t green,
+        orcus::spreadsheet::color_elem_t blue) override;
+    void set_strikethrough_style(orcus::spreadsheet::strikethrough_style_t s) override;
+    void set_strikethrough_type(orcus::spreadsheet::strikethrough_type_t s) override;
+    void set_strikethrough_width(orcus::spreadsheet::strikethrough_width_t s) override;
+    void set_strikethrough_text(orcus::spreadsheet::strikethrough_text_t s) override;
+    std::size_t commit() override;
+};
+
 class ScOrcusStyles : public orcus::spreadsheet::iface::import_styles
 {
 private:
     ScOrcusFactory& mrFactory;
 
-    struct font
-    {
-        std::optional<OUString> maName;
-        std::optional<double> mnSize;
-        std::optional<Color> maColor;
-        std::optional<bool> mbBold;
-        std::optional<bool> mbItalic;
-        std::optional<FontLineStyle> meUnderline;
-        std::optional<Color> maUnderlineColor;
-        std::optional<FontStrikeout> meStrikeout;
+    std::vector<ScOrcusFont> maFonts;
 
-        void applyToItemSet(SfxItemSet& rSet) const;
-    };
-
-    font maCurrentFont;
-    std::vector<font> maFonts;
+    ScOrcusFontStyle maFontStyle;
 
     struct fill
     {
@@ -463,9 +524,25 @@ public:
 
     void applyXfToItemSet(SfxItemSet& rSet, size_t xfId);
 
-    // font
+#if 1
+    virtual orcus::spreadsheet::iface::import_font_style* start_font_style() override;
+    virtual orcus::spreadsheet::iface::import_fill_style* start_fill_style() override;
+    virtual orcus::spreadsheet::iface::import_border_style* start_border_style() override;
+    virtual orcus::spreadsheet::iface::import_cell_protection* start_cell_protection() override;
+    virtual orcus::spreadsheet::iface::import_number_format* start_number_format() override;
+    virtual orcus::spreadsheet::iface::import_xf* start_xf(orcus::spreadsheet::xf_category_t cat) override;
+    virtual orcus::spreadsheet::iface::import_cell_style* start_cell_style() override;
 
     virtual void set_font_count(size_t n) override;
+    virtual void set_fill_count(size_t n) override;
+    virtual void set_border_count(size_t n) override;
+    virtual void set_number_format_count(size_t n) override;
+    virtual void set_xf_count(orcus::spreadsheet::xf_category_t cat, size_t n) override;
+    virtual void set_cell_style_count(size_t n) override;
+
+#else
+    // font
+
     virtual void set_font_bold(bool b) override;
     virtual void set_font_italic(bool b) override;
     virtual void set_font_name(std::string_view name) override;
@@ -490,15 +567,12 @@ public:
 
     // fill
 
-    virtual void set_fill_count(size_t n) override;
     virtual void set_fill_pattern_type(orcus::spreadsheet::fill_pattern_t fp) override;
     virtual void set_fill_fg_color(orcus::spreadsheet::color_elem_t alpha, orcus::spreadsheet::color_elem_t red, orcus::spreadsheet::color_elem_t green, orcus::spreadsheet::color_elem_t blue) override;
     virtual void set_fill_bg_color(orcus::spreadsheet::color_elem_t alpha, orcus::spreadsheet::color_elem_t red, orcus::spreadsheet::color_elem_t green, orcus::spreadsheet::color_elem_t blue) override;
     virtual size_t commit_fill() override;
 
     // border
-
-    virtual void set_border_count(size_t n) override;
 
     virtual void set_border_style(orcus::spreadsheet::border_direction_t dir, orcus::spreadsheet::border_style_t style) override;
     virtual void set_border_color(orcus::spreadsheet::border_direction_t dir,
@@ -517,23 +591,19 @@ public:
     virtual size_t commit_cell_protection() override;
 
     // number format
-    virtual void set_number_format_count(size_t n) override;
     virtual void set_number_format_identifier(size_t n) override;
     virtual void set_number_format_code(std::string_view s) override;
     virtual size_t commit_number_format() override;
 
     // cell style xf
 
-    virtual void set_cell_style_xf_count(size_t n) override;
     virtual size_t commit_cell_style_xf() override;
 
     // cell xf
 
-    virtual void set_cell_xf_count(size_t n) override;
     virtual size_t commit_cell_xf() override;
 
     // dxf
-    virtual void set_dxf_count(size_t count) override;
     virtual size_t commit_dxf() override;
 
     // xf (cell format) - used both by cell xf and cell style xf.
@@ -550,12 +620,12 @@ public:
 
     // cell style entry
 
-    virtual void set_cell_style_count(size_t n) override;
     virtual void set_cell_style_name(std::string_view name) override;
     virtual void set_cell_style_xf(size_t index) override;
     virtual void set_cell_style_builtin(size_t index) override;
     virtual void set_cell_style_parent_name(std::string_view name) override;
     virtual size_t commit_cell_style() override;
+#endif
 };
 
 class ScOrcusFactory : public orcus::spreadsheet::iface::import_factory

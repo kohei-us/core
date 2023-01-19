@@ -726,16 +726,18 @@ double translateToInternal(double nVal, orcus::length_unit_t unit)
 
 }
 
-void ScOrcusSheetProperties::set_column_width(os::col_t col, double width, orcus::length_unit_t unit)
+void ScOrcusSheetProperties::set_column_width(os::col_t col, os::col_t col_span, double width, orcus::length_unit_t unit)
 {
     double nNewWidth = translateToInternal(width, unit);
-    mrDoc.getDoc().SetColWidthOnly(col, mnTab, nNewWidth);
+
+    for (os::col_t offset = 0; offset < col_span; ++offset)
+        mrDoc.getDoc().SetColWidthOnly(col + offset, mnTab, nNewWidth);
 }
 
-void ScOrcusSheetProperties::set_column_hidden(os::col_t col, bool hidden)
+void ScOrcusSheetProperties::set_column_hidden(os::col_t col, os::col_t col_span, bool hidden)
 {
     if (hidden)
-        mrDoc.getDoc().SetColHidden(col, col, mnTab, hidden);
+        mrDoc.getDoc().SetColHidden(col, col + col_span - 1, mnTab, hidden);
 }
 
 void ScOrcusSheetProperties::set_row_height(os::row_t row, double height, orcus::length_unit_t unit)
@@ -1223,6 +1225,25 @@ void ScOrcusSheet::set_format(os::row_t row_start, os::col_t col_start,
     mrDoc.getDoc().ApplyPatternAreaTab(col_start, row_start, col_end, row_end, mnTab, aPattern);
 }
 
+void ScOrcusSheet::set_column_format(
+    os::col_t col, os::col_t col_span, std::size_t xf_index)
+{
+    ScPatternAttr aPattern(mrDoc.getDoc().GetPool());
+    mrStyles.applyXfToItemSet(aPattern.GetItemSet(), xf_index);
+
+    mrDoc.getDoc().ApplyPatternAreaTab(
+        col, 0, col + col_span - 1, mrDoc.getDoc().MaxRow(), mnTab, aPattern);
+}
+
+void ScOrcusSheet::set_row_format(os::row_t row, std::size_t xf_index)
+{
+    ScPatternAttr aPattern(mrDoc.getDoc().GetPool());
+    mrStyles.applyXfToItemSet(aPattern.GetItemSet(), xf_index);
+
+    mrDoc.getDoc().ApplyPatternAreaTab(
+        0, row, mrDoc.getDoc().MaxCol(), row, mnTab, aPattern);
+}
+
 orcus::spreadsheet::range_size_t ScOrcusSheet::get_sheet_size() const
 {
     orcus::spreadsheet::range_size_t ret;
@@ -1307,8 +1328,348 @@ size_t ScOrcusSharedStrings::commit_segments()
         OStringToOUString(aStr, mrFactory.getGlobalSettings().getTextEncoding()));
 }
 
+void ScOrcusFont::applyToItemSet( SfxItemSet& rSet ) const
+{
+    if (mbBold)
+    {
+        FontWeight eWeight = *mbBold ? WEIGHT_BOLD : WEIGHT_NORMAL;
+        rSet.Put(SvxWeightItem(eWeight, ATTR_FONT_WEIGHT));
+    }
+
+    if (mbBoldAsian)
+    {
+        FontWeight eWeight = *mbBoldAsian ? WEIGHT_BOLD : WEIGHT_NORMAL;
+        rSet.Put(SvxWeightItem(eWeight, ATTR_CJK_FONT_WEIGHT));
+    }
+
+    if (mbBoldComplex)
+    {
+        FontWeight eWeight = *mbBoldComplex ? WEIGHT_BOLD : WEIGHT_NORMAL;
+        rSet.Put(SvxWeightItem(eWeight, ATTR_CTL_FONT_WEIGHT));
+    }
+
+    if (mbItalic)
+    {
+        FontItalic eItalic = *mbItalic ? ITALIC_NORMAL : ITALIC_NONE;
+        rSet.Put(SvxPostureItem(eItalic, ATTR_FONT_POSTURE));
+    }
+
+    if (mbItalicAsian)
+    {
+        FontItalic eItalic = *mbItalicAsian ? ITALIC_NORMAL : ITALIC_NONE;
+        rSet.Put(SvxPostureItem(eItalic, ATTR_CJK_FONT_POSTURE));
+    }
+
+    if (mbItalicComplex)
+    {
+        FontItalic eItalic = *mbItalicComplex ? ITALIC_NORMAL : ITALIC_NONE;
+        rSet.Put(SvxPostureItem(eItalic, ATTR_CTL_FONT_POSTURE));
+    }
+
+    if (maColor)
+        rSet.Put( SvxColorItem(*maColor, ATTR_FONT_COLOR));
+
+    if (maName && !maName->isEmpty())
+        rSet.Put( SvxFontItem( FAMILY_DONTKNOW, *maName, *maName, PITCH_DONTKNOW, RTL_TEXTENCODING_DONTKNOW, ATTR_FONT ));
+
+    if (maNameAsian && !maNameAsian->isEmpty())
+        rSet.Put( SvxFontItem( FAMILY_DONTKNOW, *maNameAsian, *maNameAsian, PITCH_DONTKNOW, RTL_TEXTENCODING_DONTKNOW, ATTR_CJK_FONT ));
+
+    if (maNameComplex && !maNameComplex->isEmpty())
+        rSet.Put( SvxFontItem( FAMILY_DONTKNOW, *maNameComplex, *maNameComplex, PITCH_DONTKNOW, RTL_TEXTENCODING_DONTKNOW, ATTR_CTL_FONT ));
+
+    if (mnSize)
+    {
+        double fSize = translateToInternal(*mnSize, orcus::length_unit_t::point);
+        rSet.Put(SvxFontHeightItem(fSize, 100, ATTR_FONT_HEIGHT));
+    }
+
+    if (mnSizeAsian)
+    {
+        double fSize = translateToInternal(*mnSizeAsian, orcus::length_unit_t::point);
+        rSet.Put(SvxFontHeightItem(fSize, 100, ATTR_CJK_FONT_HEIGHT));
+    }
+
+    if (mnSizeComplex)
+    {
+        double fSize = translateToInternal(*mnSizeComplex, orcus::length_unit_t::point);
+        rSet.Put(SvxFontHeightItem(fSize, 100, ATTR_CTL_FONT_HEIGHT));
+    }
+
+    if (meUnderline)
+    {
+        SvxUnderlineItem aUnderline(*meUnderline, ATTR_FONT_UNDERLINE);
+        if (maUnderlineColor)
+            aUnderline.SetColor(*maUnderlineColor);
+        rSet.Put(aUnderline);
+    }
+
+    if (meStrikeout)
+        rSet.Put(SvxCrossedOutItem(*meStrikeout, ATTR_FONT_CROSSEDOUT));
+}
+
+ScOrcusFontStyle::ScOrcusFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts ) :
+    mrFactory(rFactory),
+    mrFonts(rFonts)
+{
+}
+
+void ScOrcusFontStyle::reset()
+{
+    maCurrentFont = ScOrcusFont();
+}
+
+void ScOrcusFontStyle::set_bold(bool b)
+{
+    maCurrentFont.mbBold = b;
+}
+
+void ScOrcusFontStyle::set_bold_asian(bool b)
+{
+    maCurrentFont.mbBoldAsian = b;
+}
+
+void ScOrcusFontStyle::set_bold_complex(bool b)
+{
+    maCurrentFont.mbBoldComplex = b;
+}
+
+void ScOrcusFontStyle::set_italic(bool b)
+{
+    maCurrentFont.mbItalic = b;
+}
+
+void ScOrcusFontStyle::set_italic_asian(bool b)
+{
+    maCurrentFont.mbItalicAsian = b;
+}
+
+void ScOrcusFontStyle::set_italic_complex(bool b)
+{
+    maCurrentFont.mbItalicComplex = b;
+}
+
+void ScOrcusFontStyle::set_name(std::string_view name)
+{
+    OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
+    maCurrentFont.maName = aName;
+}
+
+void ScOrcusFontStyle::set_name_asian(std::string_view name)
+{
+    OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
+    maCurrentFont.maNameAsian = aName;
+}
+
+void ScOrcusFontStyle::set_name_complex(std::string_view name)
+{
+    OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
+    maCurrentFont.maNameComplex = aName;
+}
+
+void ScOrcusFontStyle::set_size(double point)
+{
+    maCurrentFont.mnSize = point;
+}
+
+void ScOrcusFontStyle::set_size_asian(double point)
+{
+    maCurrentFont.mnSizeAsian = point;
+}
+
+void ScOrcusFontStyle::set_size_complex(double point)
+{
+    maCurrentFont.mnSizeComplex = point;
+}
+
+void ScOrcusFontStyle::set_underline(os::underline_t e)
+{
+    switch(e)
+    {
+        case os::underline_t::single_line:
+        case os::underline_t::single_accounting:
+            maCurrentFont.meUnderline = LINESTYLE_SINGLE;
+            break;
+        case os::underline_t::double_line:
+        case os::underline_t::double_accounting:
+            maCurrentFont.meUnderline = LINESTYLE_DOUBLE;
+            break;
+        case os::underline_t::none:
+            maCurrentFont.meUnderline = LINESTYLE_NONE;
+            break;
+        case os::underline_t::dotted:
+            maCurrentFont.meUnderline = LINESTYLE_DOTTED;
+            break;
+        case os::underline_t::dash:
+            maCurrentFont.meUnderline = LINESTYLE_DASH;
+            break;
+        case os::underline_t::long_dash:
+            maCurrentFont.meUnderline = LINESTYLE_LONGDASH;
+            break;
+        case os::underline_t::dot_dash:
+            maCurrentFont.meUnderline = LINESTYLE_DASHDOT;
+            break;
+        case os::underline_t::dot_dot_dash:
+            maCurrentFont.meUnderline = LINESTYLE_DASHDOTDOT;
+            break;
+        case os::underline_t::wave:
+            maCurrentFont.meUnderline = LINESTYLE_WAVE;
+            break;
+        default:
+            ;
+    }
+}
+
+void ScOrcusFontStyle::set_underline_width(os::underline_width_t e)
+{
+    if (e == os::underline_width_t::bold || e == os::underline_width_t::thick)
+    {
+        if (maCurrentFont.meUnderline)
+        {
+            switch (*maCurrentFont.meUnderline)
+            {
+                case LINESTYLE_NONE:
+                case LINESTYLE_SINGLE:
+                    maCurrentFont.meUnderline = LINESTYLE_BOLD;
+                    break;
+                case LINESTYLE_DOTTED:
+                    maCurrentFont.meUnderline = LINESTYLE_BOLDDOTTED;
+                    break;
+                case LINESTYLE_DASH:
+                    maCurrentFont.meUnderline = LINESTYLE_BOLDDASH;
+                    break;
+                case LINESTYLE_LONGDASH:
+                    maCurrentFont.meUnderline = LINESTYLE_BOLDLONGDASH;
+                    break;
+                case LINESTYLE_DASHDOT:
+                    maCurrentFont.meUnderline = LINESTYLE_BOLDDASHDOT;
+                    break;
+                case LINESTYLE_DASHDOTDOT:
+                    maCurrentFont.meUnderline = LINESTYLE_BOLDDASHDOTDOT;
+                    break;
+                case LINESTYLE_WAVE:
+                    maCurrentFont.meUnderline = LINESTYLE_BOLDWAVE;
+                    break;
+                default:
+                    ;
+            }
+        }
+        else
+            maCurrentFont.meUnderline = LINESTYLE_BOLD;
+    }
+}
+
+void ScOrcusFontStyle::set_underline_mode(os::underline_mode_t /*e*/)
+{
+}
+
+void ScOrcusFontStyle::set_underline_type(os::underline_type_t  e )
+{
+    if (e == os::underline_type_t::double_type)
+    {
+        if (maCurrentFont.meUnderline)
+        {
+            switch (*maCurrentFont.meUnderline)
+            {
+                case LINESTYLE_NONE:
+                case LINESTYLE_SINGLE:
+                    maCurrentFont.meUnderline = LINESTYLE_DOUBLE;
+                    break;
+                case LINESTYLE_WAVE:
+                    maCurrentFont.meUnderline = LINESTYLE_DOUBLEWAVE;
+                    break;
+                default:
+                    ;
+            }
+        }
+        else
+            maCurrentFont.meUnderline = LINESTYLE_DOUBLE;
+    }
+}
+
+void ScOrcusFontStyle::set_underline_color(
+    os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
+{
+    maCurrentFont.maUnderlineColor = Color(ColorAlpha, alpha, red, green, blue);
+}
+
+void ScOrcusFontStyle::set_color(
+    os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
+{
+    maCurrentFont.maColor = Color(ColorAlpha, alpha, red, green, blue);
+}
+
+void ScOrcusFontStyle::set_strikethrough_style(os::strikethrough_style_t /*s*/)
+{
+}
+
+void ScOrcusFontStyle::set_strikethrough_type(os::strikethrough_type_t s)
+{
+    if (maCurrentFont.meStrikeout)
+    {
+        if (*maCurrentFont.meStrikeout == STRIKEOUT_BOLD ||
+            *maCurrentFont.meStrikeout == STRIKEOUT_SLASH ||
+            *maCurrentFont.meStrikeout == STRIKEOUT_X)
+            return;
+    }
+
+    switch (s)
+    {
+        case os::strikethrough_type_t::unknown:
+            maCurrentFont.meStrikeout = STRIKEOUT_DONTKNOW;
+            break;
+        case os::strikethrough_type_t::none:
+            maCurrentFont.meStrikeout = STRIKEOUT_NONE;
+            break;
+        case os::strikethrough_type_t::single_type:
+            maCurrentFont.meStrikeout = STRIKEOUT_SINGLE;
+            break;
+        case os::strikethrough_type_t::double_type:
+            maCurrentFont.meStrikeout = STRIKEOUT_DOUBLE;
+            break;
+        default:
+            ;
+    }
+}
+
+void ScOrcusFontStyle::set_strikethrough_width(os::strikethrough_width_t s)
+{
+    switch (s)
+    {
+        case os::strikethrough_width_t::bold:
+            maCurrentFont.meStrikeout = STRIKEOUT_BOLD;
+            break;
+        default:
+            ;
+    }
+}
+
+void ScOrcusFontStyle::set_strikethrough_text(os::strikethrough_text_t s)
+{
+    switch (s)
+    {
+        case os::strikethrough_text_t::slash:
+            maCurrentFont.meStrikeout = STRIKEOUT_SLASH;
+            break;
+        case os::strikethrough_text_t::cross:
+            maCurrentFont.meStrikeout = STRIKEOUT_X;
+            break;
+        default:
+            ;
+    }
+}
+
+std::size_t ScOrcusFontStyle::commit()
+{
+    SAL_INFO("sc.orcus.style", "commit font");
+    mrFonts.push_back(maCurrentFont);
+    maCurrentFont = ScOrcusFont();
+    return mrFonts.size() - 1;
+}
+
 ScOrcusStyles::ScOrcusStyles( ScOrcusFactory& rFactory, bool bSkipDefaultStyles ) :
-    mrFactory(rFactory)
+    mrFactory(rFactory),
+    maFontStyle(rFactory, maFonts)
 {
     ScDocument& rDoc = rFactory.getDoc().getDoc();
     if (!bSkipDefaultStyles && !rDoc.GetStyleSheetPool()->HasStandardStyles())
@@ -1326,50 +1687,6 @@ std::ostream& operator<<(std::ostream& rStrm, const Color& rColor)
 
 }
 */
-
-void ScOrcusStyles::font::applyToItemSet(SfxItemSet& rSet) const
-{
-    if (mbItalic)
-    {
-        FontItalic eItalic = *mbItalic ? ITALIC_NORMAL : ITALIC_NONE;
-        rSet.Put(SvxPostureItem(eItalic, ATTR_FONT_POSTURE));
-        rSet.Put(SvxPostureItem(eItalic, ATTR_CJK_FONT_POSTURE));
-        rSet.Put(SvxPostureItem(eItalic, ATTR_CTL_FONT_POSTURE));
-    }
-
-    if (mbBold)
-    {
-        FontWeight eWeight = *mbBold ? WEIGHT_BOLD : WEIGHT_NORMAL;
-        rSet.Put(SvxWeightItem(eWeight, ATTR_FONT_WEIGHT));
-        rSet.Put(SvxWeightItem(eWeight, ATTR_CJK_FONT_WEIGHT));
-        rSet.Put(SvxWeightItem(eWeight, ATTR_CTL_FONT_WEIGHT));
-    }
-
-    if (maColor)
-        rSet.Put( SvxColorItem(*maColor, ATTR_FONT_COLOR));
-
-    if (maName && !maName->isEmpty())
-        rSet.Put( SvxFontItem( FAMILY_DONTKNOW, *maName, *maName, PITCH_DONTKNOW, RTL_TEXTENCODING_DONTKNOW, ATTR_FONT ));
-
-    if (mnSize)
-    {
-        double fSize = translateToInternal(*mnSize, orcus::length_unit_t::point);
-        rSet.Put(SvxFontHeightItem(fSize, 100, ATTR_FONT_HEIGHT));
-        rSet.Put(SvxFontHeightItem(fSize, 100, ATTR_CJK_FONT_HEIGHT));
-        rSet.Put(SvxFontHeightItem(fSize, 100, ATTR_CTL_FONT_HEIGHT));
-    }
-
-    if (meUnderline)
-    {
-        SvxUnderlineItem aUnderline(*meUnderline, ATTR_FONT_UNDERLINE);
-        if (maUnderlineColor)
-            aUnderline.SetColor(*maUnderlineColor);
-        rSet.Put(aUnderline);
-    }
-
-    if (meStrikeout)
-        rSet.Put(SvxCrossedOutItem(*meStrikeout, ATTR_FONT_CROSSEDOUT));
-}
 
 void ScOrcusStyles::fill::applyToItemSet(SfxItemSet& rSet) const
 {
@@ -1565,227 +1882,72 @@ void ScOrcusStyles::applyXfToItemSet(SfxItemSet& rSet, size_t xfId)
     applyXfToItemSet(rSet, rXf);
 }
 
+#if 1
+
+os::iface::import_font_style* ScOrcusStyles::start_font_style()
+{
+    return &maFontStyle;
+}
+
+os::iface::import_fill_style* ScOrcusStyles::start_fill_style()
+{
+    return nullptr; // TODO: implement this
+}
+
+os::iface::import_border_style* ScOrcusStyles::start_border_style()
+{
+    return nullptr; // TODO: implement this
+}
+
+os::iface::import_cell_protection* ScOrcusStyles::start_cell_protection()
+{
+    return nullptr; // TODO: implement this
+}
+
+os::iface::import_number_format* ScOrcusStyles::start_number_format()
+{
+    return nullptr; // TODO: implement this
+}
+
+os::iface::import_xf* ScOrcusStyles::start_xf(orcus::spreadsheet::xf_category_t cat)
+{
+    (void)cat;
+    return nullptr; // TODO: implement this
+}
+
+os::iface::import_cell_style* ScOrcusStyles::start_cell_style()
+{
+    return nullptr; // TODO: implement this
+}
+
+
 void ScOrcusStyles::set_font_count(size_t /*n*/)
 {
-    // needed at all?
 }
-
-void ScOrcusStyles::set_font_bold(bool b)
-{
-    maCurrentFont.mbBold = b;
-}
-
-void ScOrcusStyles::set_font_italic(bool b)
-{
-    maCurrentFont.mbItalic = b;
-}
-
-void ScOrcusStyles::set_font_name(std::string_view name)
-{
-    OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
-    maCurrentFont.maName = aName;
-}
-
-void ScOrcusStyles::set_font_size(double point)
-{
-    maCurrentFont.mnSize = point;
-}
-
-void ScOrcusStyles::set_font_underline(orcus::spreadsheet::underline_t e)
-{
-    switch(e)
-    {
-        case orcus::spreadsheet::underline_t::single_line:
-        case orcus::spreadsheet::underline_t::single_accounting:
-            maCurrentFont.meUnderline = LINESTYLE_SINGLE;
-            break;
-        case orcus::spreadsheet::underline_t::double_line:
-        case orcus::spreadsheet::underline_t::double_accounting:
-            maCurrentFont.meUnderline = LINESTYLE_DOUBLE;
-            break;
-        case orcus::spreadsheet::underline_t::none:
-            maCurrentFont.meUnderline = LINESTYLE_NONE;
-            break;
-        case orcus::spreadsheet::underline_t::dotted:
-            maCurrentFont.meUnderline = LINESTYLE_DOTTED;
-            break;
-        case orcus::spreadsheet::underline_t::dash:
-            maCurrentFont.meUnderline = LINESTYLE_DASH;
-            break;
-        case orcus::spreadsheet::underline_t::long_dash:
-            maCurrentFont.meUnderline = LINESTYLE_LONGDASH;
-            break;
-        case orcus::spreadsheet::underline_t::dot_dash:
-            maCurrentFont.meUnderline = LINESTYLE_DASHDOT;
-            break;
-        case orcus::spreadsheet::underline_t::dot_dot_dot_dash:
-            maCurrentFont.meUnderline = LINESTYLE_DASHDOTDOT; // dot-dot-dot-dash is absent from underline types in libo
-            break;
-        case orcus::spreadsheet::underline_t::wave:
-            maCurrentFont.meUnderline = LINESTYLE_WAVE;
-            break;
-        default:
-            ;
-    }
-}
-
-void ScOrcusStyles::set_font_underline_width(orcus::spreadsheet::underline_width_t e )
-{
-    if (e == orcus::spreadsheet::underline_width_t::bold || e == orcus::spreadsheet::underline_width_t::thick)
-    {
-        if (maCurrentFont.meUnderline)
-        {
-            switch (*maCurrentFont.meUnderline)
-            {
-                case LINESTYLE_NONE:
-                case LINESTYLE_SINGLE:
-                    maCurrentFont.meUnderline = LINESTYLE_BOLD;
-                    break;
-                case LINESTYLE_DOTTED:
-                    maCurrentFont.meUnderline = LINESTYLE_BOLDDOTTED;
-                    break;
-                case LINESTYLE_DASH:
-                    maCurrentFont.meUnderline = LINESTYLE_BOLDDASH;
-                    break;
-                case LINESTYLE_LONGDASH:
-                    maCurrentFont.meUnderline = LINESTYLE_BOLDLONGDASH;
-                    break;
-                case LINESTYLE_DASHDOT:
-                    maCurrentFont.meUnderline = LINESTYLE_BOLDDASHDOT;
-                    break;
-                case LINESTYLE_DASHDOTDOT:
-                    maCurrentFont.meUnderline = LINESTYLE_BOLDDASHDOTDOT;
-                    break;
-                case LINESTYLE_WAVE:
-                    maCurrentFont.meUnderline = LINESTYLE_BOLDWAVE;
-                    break;
-                default:
-                    ;
-            }
-        }
-        else
-            maCurrentFont.meUnderline = LINESTYLE_BOLD;
-    }
-}
-
-void ScOrcusStyles::set_font_underline_mode(orcus::spreadsheet::underline_mode_t /*e*/)
-{
-}
-
-void ScOrcusStyles::set_font_underline_type(orcus::spreadsheet::underline_type_t  e )
-{
-    if (e == orcus::spreadsheet::underline_type_t::double_type)
-    {
-        if (maCurrentFont.meUnderline)
-        {
-            switch (*maCurrentFont.meUnderline)
-            {
-                case LINESTYLE_NONE:
-                case LINESTYLE_SINGLE:
-                    maCurrentFont.meUnderline = LINESTYLE_DOUBLE;
-                    break;
-                case LINESTYLE_WAVE:
-                    maCurrentFont.meUnderline = LINESTYLE_DOUBLEWAVE;
-                    break;
-                default:
-                    ;
-            }
-        }
-        else
-            maCurrentFont.meUnderline = LINESTYLE_DOUBLE;
-    }
-}
-
-void ScOrcusStyles::set_font_underline_color(orcus::spreadsheet::color_elem_t alpha,
-            orcus::spreadsheet::color_elem_t red,
-            orcus::spreadsheet::color_elem_t green,
-            orcus::spreadsheet::color_elem_t blue)
-{
-    maCurrentFont.maUnderlineColor = Color(ColorAlpha, alpha, red, green, blue);
-}
-
-void ScOrcusStyles::set_font_color(orcus::spreadsheet::color_elem_t alpha,
-            orcus::spreadsheet::color_elem_t red,
-            orcus::spreadsheet::color_elem_t green,
-            orcus::spreadsheet::color_elem_t blue)
-{
-    maCurrentFont.maColor = Color(ColorAlpha, alpha, red, green, blue);
-}
-
-void ScOrcusStyles::set_strikethrough_style(orcus::spreadsheet::strikethrough_style_t /*s*/)
-{
-}
-
-void ScOrcusStyles::set_strikethrough_type(orcus::spreadsheet::strikethrough_type_t s)
-{
-    if (maCurrentFont.meStrikeout)
-    {
-        if (*maCurrentFont.meStrikeout == STRIKEOUT_BOLD ||
-            *maCurrentFont.meStrikeout == STRIKEOUT_SLASH ||
-            *maCurrentFont.meStrikeout == STRIKEOUT_X)
-            return;
-    }
-
-    switch (s)
-    {
-        case os::strikethrough_type_t::unknown:
-            maCurrentFont.meStrikeout = STRIKEOUT_DONTKNOW;
-            break;
-        case os::strikethrough_type_t::none:
-            maCurrentFont.meStrikeout = STRIKEOUT_NONE;
-            break;
-        case os::strikethrough_type_t::single:
-            maCurrentFont.meStrikeout = STRIKEOUT_SINGLE;
-            break;
-        case os::strikethrough_type_t::double_type:
-            maCurrentFont.meStrikeout = STRIKEOUT_DOUBLE;
-            break;
-        default:
-            ;
-    }
-}
-
-void ScOrcusStyles::set_strikethrough_width(orcus::spreadsheet::strikethrough_width_t s)
-{
-    switch (s)
-    {
-        case os::strikethrough_width_t::bold:
-            maCurrentFont.meStrikeout = STRIKEOUT_BOLD;
-            break;
-        default:
-            ;
-    }
-}
-
-void ScOrcusStyles::set_strikethrough_text(orcus::spreadsheet::strikethrough_text_t s)
-{
-    switch (s)
-    {
-        case os::strikethrough_text_t::slash:
-            maCurrentFont.meStrikeout = STRIKEOUT_SLASH;
-            break;
-        case os::strikethrough_text_t::cross:
-            maCurrentFont.meStrikeout = STRIKEOUT_X;
-            break;
-        default:
-            ;
-    }
-}
-
-size_t ScOrcusStyles::commit_font()
-{
-    SAL_INFO("sc.orcus.style", "commit font");
-    maFonts.push_back(maCurrentFont);
-    maCurrentFont = ScOrcusStyles::font();
-    return maFonts.size() - 1;
-}
-
-// fill
 
 void ScOrcusStyles::set_fill_count(size_t /*n*/)
 {
-    // needed at all?
 }
+
+void ScOrcusStyles::set_border_count(size_t /*n*/)
+{
+}
+
+void ScOrcusStyles::set_number_format_count(size_t /*n*/)
+{
+}
+
+void ScOrcusStyles::set_xf_count(orcus::spreadsheet::xf_category_t /*cat*/, size_t /*n*/)
+{
+}
+
+void ScOrcusStyles::set_cell_style_count(size_t /*n*/)
+{
+}
+
+#else
+
+// fill
 
 void ScOrcusStyles::set_fill_pattern_type(orcus::spreadsheet::fill_pattern_t fp)
 {
@@ -1813,11 +1975,6 @@ size_t ScOrcusStyles::commit_fill()
 }
 
 // border
-
-void ScOrcusStyles::set_border_count(size_t /*n*/)
-{
-    // needed at all?
-}
 
 void ScOrcusStyles::set_border_style(
     orcus::spreadsheet::border_direction_t dir, orcus::spreadsheet::border_style_t style)
@@ -1941,10 +2098,6 @@ size_t ScOrcusStyles::commit_cell_protection()
     return maProtections.size() - 1;
 }
 
-void ScOrcusStyles::set_number_format_count(size_t)
-{
-}
-
 void ScOrcusStyles::set_number_format_identifier(size_t)
 {
 }
@@ -1965,11 +2118,6 @@ size_t ScOrcusStyles::commit_number_format()
 
 // cell style xf
 
-void ScOrcusStyles::set_cell_style_xf_count(size_t /*n*/)
-{
-    // needed at all?
-}
-
 size_t ScOrcusStyles::commit_cell_style_xf()
 {
     SAL_INFO("sc.orcus.style", "commit cell style xf");
@@ -1979,11 +2127,6 @@ size_t ScOrcusStyles::commit_cell_style_xf()
 
 // cell xf
 
-void ScOrcusStyles::set_cell_xf_count(size_t /*n*/)
-{
-    // needed at all?
-}
-
 size_t ScOrcusStyles::commit_cell_xf()
 {
     SAL_INFO("sc.orcus.style", "commit cell xf");
@@ -1992,10 +2135,6 @@ size_t ScOrcusStyles::commit_cell_xf()
 }
 
 // dxf
-
-void ScOrcusStyles::set_dxf_count(size_t /*n*/)
-{
-}
 
 size_t ScOrcusStyles::commit_dxf()
 {
@@ -2099,11 +2238,6 @@ void ScOrcusStyles::set_xf_vertical_alignment(orcus::spreadsheet::ver_alignment_
 // cell style entry
 // not needed for now for gnumeric
 
-void ScOrcusStyles::set_cell_style_count(size_t /*n*/)
-{
-    // needed at all?
-}
-
 void ScOrcusStyles::set_cell_style_name(std::string_view name)
 {
     OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
@@ -2155,6 +2289,8 @@ size_t ScOrcusStyles::commit_cell_style()
 
     return 0;
 }
+
+#endif
 
 // auto filter import
 

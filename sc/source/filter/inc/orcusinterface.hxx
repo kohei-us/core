@@ -378,6 +378,15 @@ struct ScOrcusFont
     void applyToItemSet( SfxItemSet& rSet ) const;
 };
 
+struct ScOrcusFill
+{
+    std::optional<orcus::spreadsheet::fill_pattern_t> mePattern;
+    std::optional<Color> maFgColor;
+    std::optional<Color> maBgColor; // currently not used.
+
+    void applyToItemSet( SfxItemSet& rSet ) const;
+};
+
 class ScOrcusFontStyle : public orcus::spreadsheet::iface::import_font_style
 {
     ScOrcusFont maCurrentFont;
@@ -422,26 +431,41 @@ public:
     std::size_t commit() override;
 };
 
+class ScOrcusFillStyle : public orcus::spreadsheet::iface::import_fill_style
+{
+    ScOrcusFill maCurrentFill;
+    ScOrcusFactory& mrFactory;
+    std::vector<ScOrcusFill>& mrFills;
+
+public:
+    ScOrcusFillStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFill>& rFills );
+
+    void reset();
+
+    void set_pattern_type(orcus::spreadsheet::fill_pattern_t fp) override;
+    void set_fg_color(
+        orcus::spreadsheet::color_elem_t alpha,
+        orcus::spreadsheet::color_elem_t red,
+        orcus::spreadsheet::color_elem_t green,
+        orcus::spreadsheet::color_elem_t blue) override;
+    void set_bg_color(
+        orcus::spreadsheet::color_elem_t alpha,
+        orcus::spreadsheet::color_elem_t red,
+        orcus::spreadsheet::color_elem_t green,
+        orcus::spreadsheet::color_elem_t blue) override;
+    std::size_t commit() override;
+};
+
 class ScOrcusStyles : public orcus::spreadsheet::iface::import_styles
 {
 private:
     ScOrcusFactory& mrFactory;
 
     std::vector<ScOrcusFont> maFonts;
+    std::vector<ScOrcusFill> maFills;
 
     ScOrcusFontStyle maFontStyle;
-
-    struct fill
-    {
-        std::optional<orcus::spreadsheet::fill_pattern_t> mePattern;
-        std::optional<Color> maFgColor;
-        std::optional<Color> maBgColor; // currently not used.
-
-        void applyToItemSet(SfxItemSet& rSet) const;
-    };
-
-    fill maCurrentFill;
-    std::vector<fill> maFills;
+    ScOrcusFillStyle maFillStyle;
 
     struct border
     {

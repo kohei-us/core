@@ -1408,6 +1408,15 @@ void ScOrcusFont::applyToItemSet( SfxItemSet& rSet ) const
         rSet.Put(SvxCrossedOutItem(*meStrikeout, ATTR_FONT_CROSSEDOUT));
 }
 
+void ScOrcusFill::applyToItemSet( SfxItemSet& rSet ) const
+{
+    if (!mePattern || !maFgColor)
+        return;
+
+    if (*mePattern == os::fill_pattern_t::solid)
+        rSet.Put(SvxBrushItem(*maFgColor, ATTR_BACKGROUND));
+}
+
 ScOrcusFontStyle::ScOrcusFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts ) :
     mrFactory(rFactory),
     mrFonts(rFonts)
@@ -1667,9 +1676,46 @@ std::size_t ScOrcusFontStyle::commit()
     return mrFonts.size() - 1;
 }
 
+ScOrcusFillStyle::ScOrcusFillStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFill>& rFills ) :
+    mrFactory(rFactory),
+    mrFills(rFills)
+{
+}
+
+void ScOrcusFillStyle::reset()
+{
+    maCurrentFill = ScOrcusFill();
+}
+
+void ScOrcusFillStyle::set_pattern_type(os::fill_pattern_t fp)
+{
+    maCurrentFill.mePattern = fp;
+}
+
+void ScOrcusFillStyle::set_fg_color(
+    os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
+{
+    maCurrentFill.maFgColor = Color(ColorAlpha, alpha, red, green, blue);
+}
+
+void ScOrcusFillStyle::set_bg_color(
+    os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
+{
+    maCurrentFill.maBgColor = Color(ColorAlpha, alpha, red, green, blue);
+}
+
+std::size_t ScOrcusFillStyle::commit()
+{
+    SAL_INFO("sc.orcus.style", "commit fill");
+    mrFills.push_back(maCurrentFill);
+    maCurrentFill = ScOrcusFill();
+    return mrFills.size() - 1;
+}
+
 ScOrcusStyles::ScOrcusStyles( ScOrcusFactory& rFactory, bool bSkipDefaultStyles ) :
     mrFactory(rFactory),
-    maFontStyle(rFactory, maFonts)
+    maFontStyle(rFactory, maFonts),
+    maFillStyle(rFactory, maFills)
 {
     ScDocument& rDoc = rFactory.getDoc().getDoc();
     if (!bSkipDefaultStyles && !rDoc.GetStyleSheetPool()->HasStandardStyles())
@@ -1687,15 +1733,6 @@ std::ostream& operator<<(std::ostream& rStrm, const Color& rColor)
 
 }
 */
-
-void ScOrcusStyles::fill::applyToItemSet(SfxItemSet& rSet) const
-{
-    if (!mePattern || !maFgColor)
-        return;
-
-    if (*mePattern == os::fill_pattern_t::solid)
-        rSet.Put(SvxBrushItem(*maFgColor, ATTR_BACKGROUND));
-}
 
 void ScOrcusStyles::protection::applyToItemSet(SfxItemSet& rSet) const
 {
@@ -1831,8 +1868,7 @@ void ScOrcusStyles::applyXfToItemSet(SfxItemSet& rSet, const xf& rXf)
         return;
     }
 
-    const fill& rFill = maFills[nFillId];
-    rFill.applyToItemSet(rSet);
+    maFills[nFillId].applyToItemSet(rSet);
 
     size_t nBorderId = rXf.mnBorderId;
     if (nBorderId >= maBorders.size())
@@ -1892,7 +1928,8 @@ os::iface::import_font_style* ScOrcusStyles::start_font_style()
 
 os::iface::import_fill_style* ScOrcusStyles::start_fill_style()
 {
-    return nullptr; // TODO: implement this
+    maFillStyle.reset();
+    return &maFillStyle;
 }
 
 os::iface::import_border_style* ScOrcusStyles::start_border_style()
@@ -1910,7 +1947,7 @@ os::iface::import_number_format* ScOrcusStyles::start_number_format()
     return nullptr; // TODO: implement this
 }
 
-os::iface::import_xf* ScOrcusStyles::start_xf(orcus::spreadsheet::xf_category_t cat)
+os::iface::import_xf* ScOrcusStyles::start_xf(os::xf_category_t cat)
 {
     (void)cat;
     return nullptr; // TODO: implement this
@@ -1938,7 +1975,7 @@ void ScOrcusStyles::set_number_format_count(size_t /*n*/)
 {
 }
 
-void ScOrcusStyles::set_xf_count(orcus::spreadsheet::xf_category_t /*cat*/, size_t /*n*/)
+void ScOrcusStyles::set_xf_count(os::xf_category_t /*cat*/, size_t /*n*/)
 {
 }
 
@@ -1950,19 +1987,19 @@ void ScOrcusStyles::set_cell_style_count(size_t /*n*/)
 
 // fill
 
-void ScOrcusStyles::set_fill_pattern_type(orcus::spreadsheet::fill_pattern_t fp)
+void ScOrcusStyles::set_fill_pattern_type(os::fill_pattern_t fp)
 {
     maCurrentFill.mePattern = fp;
 }
 
 void ScOrcusStyles::set_fill_fg_color(
-    orcus::spreadsheet::color_elem_t alpha, orcus::spreadsheet::color_elem_t red, orcus::spreadsheet::color_elem_t green, orcus::spreadsheet::color_elem_t blue)
+    os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
 {
     maCurrentFill.maFgColor = Color(ColorAlpha, alpha, red, green, blue);
 }
 
 void ScOrcusStyles::set_fill_bg_color(
-    orcus::spreadsheet::color_elem_t alpha, orcus::spreadsheet::color_elem_t red, orcus::spreadsheet::color_elem_t green, orcus::spreadsheet::color_elem_t blue)
+    os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
 {
     maCurrentFill.maBgColor = Color(ColorAlpha, alpha, red, green, blue);
 }
@@ -1978,67 +2015,67 @@ size_t ScOrcusStyles::commit_fill()
 // border
 
 void ScOrcusStyles::set_border_style(
-    orcus::spreadsheet::border_direction_t dir, orcus::spreadsheet::border_style_t style)
+    os::border_direction_t dir, os::border_style_t style)
 {
     border::border_line& rBorder = maCurrentBorder.maBorders[dir];
 
     switch (style)
     {
-        case orcus::spreadsheet::border_style_t::solid:
+        case os::border_style_t::solid:
             rBorder.meStyle = SvxBorderLineStyle::SOLID;
             rBorder.mnWidth = oox::xls::API_LINE_THIN;
             break;
-        case orcus::spreadsheet::border_style_t::hair:
+        case os::border_style_t::hair:
             rBorder.meStyle = SvxBorderLineStyle::SOLID;
             rBorder.mnWidth = oox::xls::API_LINE_HAIR;
             break;
-        case orcus::spreadsheet::border_style_t::medium:
+        case os::border_style_t::medium:
             rBorder.meStyle = SvxBorderLineStyle::SOLID;
             rBorder.mnWidth = oox::xls::API_LINE_MEDIUM;
             break;
-        case orcus::spreadsheet::border_style_t::thick:
+        case os::border_style_t::thick:
             rBorder.meStyle = SvxBorderLineStyle::SOLID;
             rBorder.mnWidth = oox::xls::API_LINE_THICK;
             break;
-        case orcus::spreadsheet::border_style_t::thin:
+        case os::border_style_t::thin:
             rBorder.meStyle = SvxBorderLineStyle::SOLID;
             rBorder.mnWidth = oox::xls::API_LINE_THIN;
             break;
-        case orcus::spreadsheet::border_style_t::dash_dot:
+        case os::border_style_t::dash_dot:
             rBorder.meStyle = SvxBorderLineStyle::DASH_DOT;
             rBorder.mnWidth = oox::xls::API_LINE_THIN;
             break;
-        case orcus::spreadsheet::border_style_t::dash_dot_dot:
+        case os::border_style_t::dash_dot_dot:
             rBorder.meStyle = SvxBorderLineStyle::DASH_DOT_DOT;
             rBorder.mnWidth = oox::xls::API_LINE_THIN;
             break;
-        case orcus::spreadsheet::border_style_t::dashed:
+        case os::border_style_t::dashed:
             rBorder.meStyle = SvxBorderLineStyle::DASHED;
             rBorder.mnWidth = oox::xls::API_LINE_THIN;
             break;
-        case orcus::spreadsheet::border_style_t::dotted:
+        case os::border_style_t::dotted:
             rBorder.meStyle = SvxBorderLineStyle::DOTTED;
             rBorder.mnWidth = oox::xls::API_LINE_THIN;
             break;
-        case orcus::spreadsheet::border_style_t::double_border:
+        case os::border_style_t::double_border:
             rBorder.meStyle = SvxBorderLineStyle::DOUBLE;
             rBorder.mnWidth = oox::xls::API_LINE_THICK;
             break;
-        case orcus::spreadsheet::border_style_t::medium_dash_dot:
-        case orcus::spreadsheet::border_style_t::slant_dash_dot:
+        case os::border_style_t::medium_dash_dot:
+        case os::border_style_t::slant_dash_dot:
             rBorder.meStyle = SvxBorderLineStyle::DASH_DOT;
             rBorder.mnWidth = oox::xls::API_LINE_MEDIUM;
             break;
-        case orcus::spreadsheet::border_style_t::medium_dash_dot_dot:
+        case os::border_style_t::medium_dash_dot_dot:
             rBorder.meStyle = SvxBorderLineStyle::DASH_DOT_DOT;
             rBorder.mnWidth = oox::xls::API_LINE_MEDIUM;
             break;
-        case orcus::spreadsheet::border_style_t::medium_dashed:
+        case os::border_style_t::medium_dashed:
             rBorder.meStyle = SvxBorderLineStyle::DASHED;
             rBorder.mnWidth = oox::xls::API_LINE_MEDIUM;
             break;
-        case orcus::spreadsheet::border_style_t::unknown:
-        case orcus::spreadsheet::border_style_t::none:
+        case os::border_style_t::unknown:
+        case os::border_style_t::none:
             rBorder.mnWidth = oox::xls::API_LINE_NONE;
             break;
         default:
@@ -2046,17 +2083,17 @@ void ScOrcusStyles::set_border_style(
     }
 }
 
-void ScOrcusStyles::set_border_color(orcus::spreadsheet::border_direction_t dir,
-            orcus::spreadsheet::color_elem_t alpha,
-            orcus::spreadsheet::color_elem_t red,
-            orcus::spreadsheet::color_elem_t green,
-            orcus::spreadsheet::color_elem_t blue)
+void ScOrcusStyles::set_border_color(os::border_direction_t dir,
+            os::color_elem_t alpha,
+            os::color_elem_t red,
+            os::color_elem_t green,
+            os::color_elem_t blue)
 {
     border::border_line& current_line = maCurrentBorder.maBorders[dir];
     current_line.maColor = Color(ColorAlpha, alpha, red, green, blue);
 }
 
-void ScOrcusStyles::set_border_width(orcus::spreadsheet::border_direction_t  dir, double val, orcus::length_unit_t  unit )
+void ScOrcusStyles::set_border_width(os::border_direction_t  dir, double val, orcus::length_unit_t  unit )
 {
     border::border_line& current_line = maCurrentBorder.maBorders[dir];
     current_line.mnWidth = translateToInternal(val, unit);
@@ -2178,7 +2215,7 @@ void ScOrcusStyles::set_xf_apply_alignment(bool /*b*/)
 {
 }
 
-void ScOrcusStyles::set_xf_horizontal_alignment(orcus::spreadsheet::hor_alignment_t align)
+void ScOrcusStyles::set_xf_horizontal_alignment(os::hor_alignment_t align)
 {
     switch (align)
     {
@@ -2207,7 +2244,7 @@ void ScOrcusStyles::set_xf_horizontal_alignment(orcus::spreadsheet::hor_alignmen
     maCurrentXF.mbAlignment = true;
 }
 
-void ScOrcusStyles::set_xf_vertical_alignment(orcus::spreadsheet::ver_alignment_t align)
+void ScOrcusStyles::set_xf_vertical_alignment(os::ver_alignment_t align)
 {
     switch (align)
     {
@@ -2304,7 +2341,7 @@ ScOrcusAutoFilter::~ScOrcusAutoFilter()
 {
 }
 
-void ScOrcusAutoFilter::set_range(const orcus::spreadsheet::range_t& range)
+void ScOrcusAutoFilter::set_range(const os::range_t& range)
 {
     maRange.aStart.SetRow(range.first.row);
     maRange.aStart.SetCol(range.first.column);
@@ -2312,7 +2349,7 @@ void ScOrcusAutoFilter::set_range(const orcus::spreadsheet::range_t& range)
     maRange.aEnd.SetCol(range.last.column);
 }
 
-void ScOrcusAutoFilter::set_column(orcus::spreadsheet::col_t col)
+void ScOrcusAutoFilter::set_column(os::col_t col)
 {
     SAL_INFO("sc.orcus.autofilter", "set_column: " << col);
 }

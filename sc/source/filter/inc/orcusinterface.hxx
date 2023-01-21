@@ -401,6 +401,16 @@ struct ScOrcusBorder
     void applyToItemSet( SfxItemSet& rSet ) const;
 };
 
+struct ScOrcusProtection
+{
+    std::optional<bool> mbLocked;
+    std::optional<bool> mbHidden;
+    std::optional<bool> mbPrintContent;
+    std::optional<bool> mbFormulaHidden;
+
+    void applyToItemSet( SfxItemSet& rSet ) const;
+};
+
 class ScOrcusFontStyle : public orcus::spreadsheet::iface::import_font_style
 {
     ScOrcusFont maCurrentFont;
@@ -494,6 +504,24 @@ public:
     std::size_t commit() override;
 };
 
+class ScOrcusCellProtection : public orcus::spreadsheet::iface::import_cell_protection
+{
+    ScOrcusProtection maCurrentProtection;
+    ScOrcusFactory& mrFactory;
+    std::vector<ScOrcusProtection>& mrProtections;
+
+public:
+    ScOrcusCellProtection( ScOrcusFactory& rFactory, std::vector<ScOrcusProtection>& rProtections );
+
+    void reset();
+
+    void set_hidden(bool b) override;
+    void set_locked(bool b) override;
+    void set_print_content(bool b) override;
+    void set_formula_hidden(bool b) override;
+    std::size_t commit() override;
+};
+
 class ScOrcusStyles : public orcus::spreadsheet::iface::import_styles
 {
 private:
@@ -502,23 +530,12 @@ private:
     std::vector<ScOrcusFont> maFonts;
     std::vector<ScOrcusFill> maFills;
     std::vector<ScOrcusBorder> maBorders;
+    std::vector<ScOrcusProtection> maProtections;
 
     ScOrcusFontStyle maFontStyle;
     ScOrcusFillStyle maFillStyle;
     ScOrcusBorderStyle maBorderStyle;
-
-    struct protection
-    {
-        std::optional<bool> mbLocked;
-        std::optional<bool> mbHidden;
-        std::optional<bool> mbPrintContent;
-        std::optional<bool> mbFormulaHidden;
-
-        void applyToItemSet(SfxItemSet& rSet) const;
-    };
-
-    protection maCurrentProtection;
-    std::vector<protection> maProtections;
+    ScOrcusCellProtection maCellProtection;
 
     struct number_format
     {

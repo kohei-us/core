@@ -1479,6 +1479,18 @@ void ScOrcusBorder::applyToItemSet( SfxItemSet& rSet ) const
     rSet.Put(aBoxItem);
 }
 
+void ScOrcusProtection::applyToItemSet( SfxItemSet& rSet ) const
+{
+    if (!mbLocked && !mbHidden && !mbPrintContent && !mbFormulaHidden)
+        return;
+
+    bool bLocked = mbLocked.value_or(true); // defaults to true.
+    bool bHidden = mbHidden.value_or(false);
+    bool bFormulaHidden = mbFormulaHidden.value_or(false);
+    bool bPrintContent = mbPrintContent.value_or(false);
+    rSet.Put(ScProtectionAttr(bLocked, bFormulaHidden, bHidden, bPrintContent));
+}
+
 ScOrcusFontStyle::ScOrcusFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts ) :
     mrFactory(rFactory),
     mrFonts(rFonts)
@@ -1848,11 +1860,9 @@ void ScOrcusBorderStyle::set_style(
     }
 }
 
-void ScOrcusBorderStyle::set_color(os::border_direction_t dir,
-            os::color_elem_t alpha,
-            os::color_elem_t red,
-            os::color_elem_t green,
-            os::color_elem_t blue)
+void ScOrcusBorderStyle::set_color(
+    os::border_direction_t dir, os::color_elem_t alpha, os::color_elem_t red,
+    os::color_elem_t green, os::color_elem_t blue)
 {
     ScOrcusBorder::BorderLine& rBorderLine = maCurrentBorder.maBorders[dir];
     rBorderLine.maColor = Color(ColorAlpha, alpha, red, green, blue);
@@ -1877,11 +1887,50 @@ std::size_t ScOrcusBorderStyle::commit()
     return mrBorders.size() - 1;
 }
 
+ScOrcusCellProtection::ScOrcusCellProtection( ScOrcusFactory& rFactory, std::vector<ScOrcusProtection>& rProtections ) :
+    mrFactory(rFactory), mrProtections(rProtections)
+{
+}
+
+void ScOrcusCellProtection::reset()
+{
+    maCurrentProtection = ScOrcusProtection();
+}
+
+void ScOrcusCellProtection::set_hidden(bool b)
+{
+    maCurrentProtection.mbHidden = b;
+}
+
+void ScOrcusCellProtection::set_locked(bool b)
+{
+    maCurrentProtection.mbLocked = b;
+}
+
+void ScOrcusCellProtection::set_print_content(bool b )
+{
+    maCurrentProtection.mbPrintContent = b;
+}
+
+void ScOrcusCellProtection::set_formula_hidden(bool b )
+{
+    maCurrentProtection.mbFormulaHidden = b;
+}
+
+std::size_t ScOrcusCellProtection::commit()
+{
+    SAL_INFO("sc.orcus.style", "commit cell protection");
+    mrProtections.push_back(maCurrentProtection);
+    maCurrentProtection = ScOrcusProtection();
+    return mrProtections.size() - 1;
+}
+
 ScOrcusStyles::ScOrcusStyles( ScOrcusFactory& rFactory, bool bSkipDefaultStyles ) :
     mrFactory(rFactory),
     maFontStyle(rFactory, maFonts),
     maFillStyle(rFactory, maFills),
-    maBorderStyle(rFactory, maBorders)
+    maBorderStyle(rFactory, maBorders),
+    maCellProtection(rFactory, maProtections)
 {
     ScDocument& rDoc = rFactory.getDoc().getDoc();
     if (!bSkipDefaultStyles && !rDoc.GetStyleSheetPool()->HasStandardStyles())
@@ -1899,18 +1948,6 @@ std::ostream& operator<<(std::ostream& rStrm, const Color& rColor)
 
 }
 */
-
-void ScOrcusStyles::protection::applyToItemSet(SfxItemSet& rSet) const
-{
-    if (!mbLocked && !mbHidden && !mbPrintContent && !mbFormulaHidden)
-        return;
-
-    bool bLocked = mbLocked.value_or(true); // defaults to true.
-    bool bHidden = mbHidden.value_or(false);
-    bool bFormulaHidden = mbFormulaHidden.value_or(false);
-    bool bPrintContent = mbPrintContent.value_or(false);
-    rSet.Put(ScProtectionAttr(bLocked, bFormulaHidden, bHidden, bPrintContent));
-}
 
 void ScOrcusStyles::number_format::applyToItemSet(SfxItemSet& rSet, const ScDocument& rDoc) const
 {
@@ -2040,7 +2077,8 @@ os::iface::import_border_style* ScOrcusStyles::start_border_style()
 
 os::iface::import_cell_protection* ScOrcusStyles::start_cell_protection()
 {
-    return nullptr; // TODO: implement this
+    maCellProtection.reset();
+    return &maCellProtection;
 }
 
 os::iface::import_number_format* ScOrcusStyles::start_number_format()
@@ -2111,38 +2149,6 @@ size_t ScOrcusStyles::commit_fill()
     maFills.push_back(maCurrentFill);
     maCurrentFill = ScOrcusStyles::fill();
     return maFills.size() - 1;
-}
-
-// border
-
-
-// cell protection
-void ScOrcusStyles::set_cell_hidden(bool b)
-{
-    maCurrentProtection.mbHidden = b;
-}
-
-void ScOrcusStyles::set_cell_locked(bool b)
-{
-    maCurrentProtection.mbLocked = b;
-}
-
-void ScOrcusStyles::set_cell_print_content(bool b )
-{
-    maCurrentProtection.mbPrintContent = b;
-}
-
-void ScOrcusStyles::set_cell_formula_hidden(bool b )
-{
-    maCurrentProtection.mbFormulaHidden = b;
-}
-
-size_t ScOrcusStyles::commit_cell_protection()
-{
-    SAL_INFO("sc.orcus.style", "commit cell protection");
-    maProtections.push_back(maCurrentProtection);
-    maCurrentProtection = ScOrcusStyles::protection();
-    return maProtections.size() - 1;
 }
 
 void ScOrcusStyles::set_number_format_identifier(size_t)

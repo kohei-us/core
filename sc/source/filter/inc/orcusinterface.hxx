@@ -621,11 +621,6 @@ public:
 
 #else
 
-    // number format
-    virtual void set_number_format_identifier(size_t n) override;
-    virtual void set_number_format_code(std::string_view s) override;
-    virtual size_t commit_number_format() override;
-
     // cell style xf
 
     virtual size_t commit_cell_style_xf() override;

@@ -1491,81 +1491,81 @@ void ScOrcusProtection::applyToItemSet( SfxItemSet& rSet ) const
     rSet.Put(ScProtectionAttr(bLocked, bFormulaHidden, bHidden, bPrintContent));
 }
 
-ScOrcusFontStyle::ScOrcusFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts ) :
+ScOrcusImportFontStyle::ScOrcusImportFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts ) :
     mrFactory(rFactory),
     mrFonts(rFonts)
 {
 }
 
-void ScOrcusFontStyle::reset()
+void ScOrcusImportFontStyle::reset()
 {
     maCurrentFont = ScOrcusFont();
 }
 
-void ScOrcusFontStyle::set_bold(bool b)
+void ScOrcusImportFontStyle::set_bold(bool b)
 {
     maCurrentFont.mbBold = b;
 }
 
-void ScOrcusFontStyle::set_bold_asian(bool b)
+void ScOrcusImportFontStyle::set_bold_asian(bool b)
 {
     maCurrentFont.mbBoldAsian = b;
 }
 
-void ScOrcusFontStyle::set_bold_complex(bool b)
+void ScOrcusImportFontStyle::set_bold_complex(bool b)
 {
     maCurrentFont.mbBoldComplex = b;
 }
 
-void ScOrcusFontStyle::set_italic(bool b)
+void ScOrcusImportFontStyle::set_italic(bool b)
 {
     maCurrentFont.mbItalic = b;
 }
 
-void ScOrcusFontStyle::set_italic_asian(bool b)
+void ScOrcusImportFontStyle::set_italic_asian(bool b)
 {
     maCurrentFont.mbItalicAsian = b;
 }
 
-void ScOrcusFontStyle::set_italic_complex(bool b)
+void ScOrcusImportFontStyle::set_italic_complex(bool b)
 {
     maCurrentFont.mbItalicComplex = b;
 }
 
-void ScOrcusFontStyle::set_name(std::string_view name)
+void ScOrcusImportFontStyle::set_name(std::string_view name)
 {
     OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
     maCurrentFont.maName = aName;
 }
 
-void ScOrcusFontStyle::set_name_asian(std::string_view name)
+void ScOrcusImportFontStyle::set_name_asian(std::string_view name)
 {
     OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
     maCurrentFont.maNameAsian = aName;
 }
 
-void ScOrcusFontStyle::set_name_complex(std::string_view name)
+void ScOrcusImportFontStyle::set_name_complex(std::string_view name)
 {
     OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
     maCurrentFont.maNameComplex = aName;
 }
 
-void ScOrcusFontStyle::set_size(double point)
+void ScOrcusImportFontStyle::set_size(double point)
 {
     maCurrentFont.mnSize = point;
 }
 
-void ScOrcusFontStyle::set_size_asian(double point)
+void ScOrcusImportFontStyle::set_size_asian(double point)
 {
     maCurrentFont.mnSizeAsian = point;
 }
 
-void ScOrcusFontStyle::set_size_complex(double point)
+void ScOrcusImportFontStyle::set_size_complex(double point)
 {
     maCurrentFont.mnSizeComplex = point;
 }
 
-void ScOrcusFontStyle::set_underline(os::underline_t e)
+void ScOrcusImportFontStyle::set_underline(os::underline_t e)
 {
     switch(e)
     {
@@ -1603,7 +1603,7 @@ void ScOrcusFontStyle::set_underline(os::underline_t e)
     }
 }
 
-void ScOrcusFontStyle::set_underline_width(os::underline_width_t e)
+void ScOrcusImportFontStyle::set_underline_width(os::underline_width_t e)
 {
     if (e == os::underline_width_t::bold || e == os::underline_width_t::thick)
     {
@@ -1642,11 +1642,11 @@ void ScOrcusFontStyle::set_underline_width(os::underline_width_t e)
     }
 }
 
-void ScOrcusFontStyle::set_underline_mode(os::underline_mode_t /*e*/)
+void ScOrcusImportFontStyle::set_underline_mode(os::underline_mode_t /*e*/)
 {
 }
 
-void ScOrcusFontStyle::set_underline_type(os::underline_type_t  e )
+void ScOrcusImportFontStyle::set_underline_type(os::underline_type_t  e )
 {
     if (e == os::underline_type_t::double_type)
     {
@@ -1670,23 +1670,23 @@ void ScOrcusFontStyle::set_underline_type(os::underline_type_t  e )
     }
 }
 
-void ScOrcusFontStyle::set_underline_color(
+void ScOrcusImportFontStyle::set_underline_color(
     os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
 {
     maCurrentFont.maUnderlineColor = Color(ColorAlpha, alpha, red, green, blue);
 }
 
-void ScOrcusFontStyle::set_color(
+void ScOrcusImportFontStyle::set_color(
     os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
 {
     maCurrentFont.maColor = Color(ColorAlpha, alpha, red, green, blue);
 }
 
-void ScOrcusFontStyle::set_strikethrough_style(os::strikethrough_style_t /*s*/)
+void ScOrcusImportFontStyle::set_strikethrough_style(os::strikethrough_style_t /*s*/)
 {
 }
 
-void ScOrcusFontStyle::set_strikethrough_type(os::strikethrough_type_t s)
+void ScOrcusImportFontStyle::set_strikethrough_type(os::strikethrough_type_t s)
 {
     if (maCurrentFont.meStrikeout)
     {
@@ -1715,7 +1715,7 @@ void ScOrcusFontStyle::set_strikethrough_type(os::strikethrough_type_t s)
     }
 }
 
-void ScOrcusFontStyle::set_strikethrough_width(os::strikethrough_width_t s)
+void ScOrcusImportFontStyle::set_strikethrough_width(os::strikethrough_width_t s)
 {
     switch (s)
     {
@@ -1727,7 +1727,7 @@ void ScOrcusFontStyle::set_strikethrough_width(os::strikethrough_width_t s)
     }
 }
 
-void ScOrcusFontStyle::set_strikethrough_text(os::strikethrough_text_t s)
+void ScOrcusImportFontStyle::set_strikethrough_text(os::strikethrough_text_t s)
 {
     switch (s)
     {
@@ -1742,7 +1742,7 @@ void ScOrcusFontStyle::set_strikethrough_text(os::strikethrough_text_t s)
     }
 }
 
-std::size_t ScOrcusFontStyle::commit()
+std::size_t ScOrcusImportFontStyle::commit()
 {
     SAL_INFO("sc.orcus.style", "commit font");
     mrFonts.push_back(maCurrentFont);
@@ -1750,35 +1750,35 @@ std::size_t ScOrcusFontStyle::commit()
     return mrFonts.size() - 1;
 }
 
-ScOrcusFillStyle::ScOrcusFillStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFill>& rFills ) :
+ScOrcusImportFillStyle::ScOrcusImportFillStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFill>& rFills ) :
     mrFactory(rFactory),
     mrFills(rFills)
 {
 }
 
-void ScOrcusFillStyle::reset()
+void ScOrcusImportFillStyle::reset()
 {
     maCurrentFill = ScOrcusFill();
 }
 
-void ScOrcusFillStyle::set_pattern_type(os::fill_pattern_t fp)
+void ScOrcusImportFillStyle::set_pattern_type(os::fill_pattern_t fp)
 {
     maCurrentFill.mePattern = fp;
 }
 
-void ScOrcusFillStyle::set_fg_color(
+void ScOrcusImportFillStyle::set_fg_color(
     os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
 {
     maCurrentFill.maFgColor = Color(ColorAlpha, alpha, red, green, blue);
 }
 
-void ScOrcusFillStyle::set_bg_color(
+void ScOrcusImportFillStyle::set_bg_color(
     os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
 {
     maCurrentFill.maBgColor = Color(ColorAlpha, alpha, red, green, blue);
 }
 
-std::size_t ScOrcusFillStyle::commit()
+std::size_t ScOrcusImportFillStyle::commit()
 {
     SAL_INFO("sc.orcus.style", "commit fill");
     mrFills.push_back(maCurrentFill);
@@ -1786,12 +1786,12 @@ std::size_t ScOrcusFillStyle::commit()
     return mrFills.size() - 1;
 }
 
-ScOrcusBorderStyle::ScOrcusBorderStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusBorder>& rBorders ) :
+ScOrcusImportBorderStyle::ScOrcusImportBorderStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusBorder>& rBorders ) :
     mrFactory(rFactory), mrBorders(rBorders)
 {
 }
 
-void ScOrcusBorderStyle::set_style(
+void ScOrcusImportBorderStyle::set_style(
     os::border_direction_t dir, os::border_style_t style)
 {
     ScOrcusBorder::BorderLine& rBorderLine = maCurrentBorder.maBorders[dir];
@@ -1860,7 +1860,7 @@ void ScOrcusBorderStyle::set_style(
     }
 }
 
-void ScOrcusBorderStyle::set_color(
+void ScOrcusImportBorderStyle::set_color(
     os::border_direction_t dir, os::color_elem_t alpha, os::color_elem_t red,
     os::color_elem_t green, os::color_elem_t blue)
 {
@@ -1868,18 +1868,18 @@ void ScOrcusBorderStyle::set_color(
     rBorderLine.maColor = Color(ColorAlpha, alpha, red, green, blue);
 }
 
-void ScOrcusBorderStyle::reset()
+void ScOrcusImportBorderStyle::reset()
 {
     maCurrentBorder = ScOrcusBorder();
 }
 
-void ScOrcusBorderStyle::set_width(os::border_direction_t  dir, double val, orcus::length_unit_t unit)
+void ScOrcusImportBorderStyle::set_width(os::border_direction_t  dir, double val, orcus::length_unit_t unit)
 {
     ScOrcusBorder::BorderLine& rBorderLine = maCurrentBorder.maBorders[dir];
     rBorderLine.mnWidth = translateToInternal(val, unit);
 }
 
-std::size_t ScOrcusBorderStyle::commit()
+std::size_t ScOrcusImportBorderStyle::commit()
 {
     SAL_INFO("sc.orcus.style", "commit border");
     mrBorders.push_back(maCurrentBorder);
@@ -1887,37 +1887,37 @@ std::size_t ScOrcusBorderStyle::commit()
     return mrBorders.size() - 1;
 }
 
-ScOrcusCellProtection::ScOrcusCellProtection( ScOrcusFactory& rFactory, std::vector<ScOrcusProtection>& rProtections ) :
+ScOrcusImportCellProtection::ScOrcusImportCellProtection( ScOrcusFactory& rFactory, std::vector<ScOrcusProtection>& rProtections ) :
     mrFactory(rFactory), mrProtections(rProtections)
 {
 }
 
-void ScOrcusCellProtection::reset()
+void ScOrcusImportCellProtection::reset()
 {
     maCurrentProtection = ScOrcusProtection();
 }
 
-void ScOrcusCellProtection::set_hidden(bool b)
+void ScOrcusImportCellProtection::set_hidden(bool b)
 {
     maCurrentProtection.mbHidden = b;
 }
 
-void ScOrcusCellProtection::set_locked(bool b)
+void ScOrcusImportCellProtection::set_locked(bool b)
 {
     maCurrentProtection.mbLocked = b;
 }
 
-void ScOrcusCellProtection::set_print_content(bool b )
+void ScOrcusImportCellProtection::set_print_content(bool b )
 {
     maCurrentProtection.mbPrintContent = b;
 }
 
-void ScOrcusCellProtection::set_formula_hidden(bool b )
+void ScOrcusImportCellProtection::set_formula_hidden(bool b )
 {
     maCurrentProtection.mbFormulaHidden = b;
 }
 
-std::size_t ScOrcusCellProtection::commit()
+std::size_t ScOrcusImportCellProtection::commit()
 {
     SAL_INFO("sc.orcus.style", "commit cell protection");
     mrProtections.push_back(maCurrentProtection);

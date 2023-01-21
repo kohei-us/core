@@ -411,14 +411,14 @@ struct ScOrcusProtection
     void applyToItemSet( SfxItemSet& rSet ) const;
 };
 
-class ScOrcusFontStyle : public orcus::spreadsheet::iface::import_font_style
+class ScOrcusImportFontStyle : public orcus::spreadsheet::iface::import_font_style
 {
     ScOrcusFont maCurrentFont;
     ScOrcusFactory& mrFactory;
     std::vector<ScOrcusFont>& mrFonts;
 
 public:
-    ScOrcusFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts );
+    ScOrcusImportFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts );
 
     void reset();
 
@@ -455,14 +455,14 @@ public:
     std::size_t commit() override;
 };
 
-class ScOrcusFillStyle : public orcus::spreadsheet::iface::import_fill_style
+class ScOrcusImportFillStyle : public orcus::spreadsheet::iface::import_fill_style
 {
     ScOrcusFill maCurrentFill;
     ScOrcusFactory& mrFactory;
     std::vector<ScOrcusFill>& mrFills;
 
 public:
-    ScOrcusFillStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFill>& rFills );
+    ScOrcusImportFillStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFill>& rFills );
 
     void reset();
 
@@ -480,14 +480,14 @@ public:
     std::size_t commit() override;
 };
 
-class ScOrcusBorderStyle : public orcus::spreadsheet::iface::import_border_style
+class ScOrcusImportBorderStyle : public orcus::spreadsheet::iface::import_border_style
 {
     ScOrcusBorder maCurrentBorder;
     ScOrcusFactory& mrFactory;
     std::vector<ScOrcusBorder>& mrBorders;
 
 public:
-    ScOrcusBorderStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusBorder>& rBorders );
+    ScOrcusImportBorderStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusBorder>& rBorders );
 
     void reset();
 
@@ -504,14 +504,14 @@ public:
     std::size_t commit() override;
 };
 
-class ScOrcusCellProtection : public orcus::spreadsheet::iface::import_cell_protection
+class ScOrcusImportCellProtection : public orcus::spreadsheet::iface::import_cell_protection
 {
     ScOrcusProtection maCurrentProtection;
     ScOrcusFactory& mrFactory;
     std::vector<ScOrcusProtection>& mrProtections;
 
 public:
-    ScOrcusCellProtection( ScOrcusFactory& rFactory, std::vector<ScOrcusProtection>& rProtections );
+    ScOrcusImportCellProtection( ScOrcusFactory& rFactory, std::vector<ScOrcusProtection>& rProtections );
 
     void reset();
 
@@ -532,10 +532,10 @@ private:
     std::vector<ScOrcusBorder> maBorders;
     std::vector<ScOrcusProtection> maProtections;
 
-    ScOrcusFontStyle maFontStyle;
-    ScOrcusFillStyle maFillStyle;
-    ScOrcusBorderStyle maBorderStyle;
-    ScOrcusCellProtection maCellProtection;
+    ScOrcusImportFontStyle maFontStyle;
+    ScOrcusImportFillStyle maFillStyle;
+    ScOrcusImportBorderStyle maBorderStyle;
+    ScOrcusImportCellProtection maCellProtection;
 
     struct number_format
     {
@@ -605,13 +605,6 @@ public:
     virtual void set_cell_style_count(size_t n) override;
 
 #else
-
-    // cell protection
-    virtual void set_cell_hidden(bool b) override;
-    virtual void set_cell_locked(bool b) override;
-    virtual void set_cell_print_content(bool b) override;
-    virtual void set_cell_formula_hidden(bool b) override;
-    virtual size_t commit_cell_protection() override;
 
     // number format
     virtual void set_number_format_identifier(size_t n) override;

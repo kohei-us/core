@@ -411,6 +411,13 @@ struct ScOrcusProtection
     void applyToItemSet( SfxItemSet& rSet ) const;
 };
 
+struct ScOrcusNumberFormat
+{
+    std::optional<OUString> maCode;
+
+    void applyToItemSet( SfxItemSet& rSet, const ScDocument& rDoc ) const;
+};
+
 class ScOrcusImportFontStyle : public orcus::spreadsheet::iface::import_font_style
 {
     ScOrcusFont maCurrentFont;
@@ -522,6 +529,22 @@ public:
     std::size_t commit() override;
 };
 
+class ScOrcusImportNumberFormat : public orcus::spreadsheet::iface::import_number_format
+{
+    ScOrcusNumberFormat maCurrentFormat;
+    ScOrcusFactory& mrFactory;
+    std::vector<ScOrcusNumberFormat>& mrNumberFormats;
+
+public:
+    ScOrcusImportNumberFormat( ScOrcusFactory& rFactory, std::vector<ScOrcusNumberFormat>& rFormats );
+
+    void reset();
+
+    void set_identifier(std::size_t id) override;
+    void set_code(std::string_view s) override;
+    std::size_t commit() override;
+};
+
 class ScOrcusStyles : public orcus::spreadsheet::iface::import_styles
 {
 private:
@@ -531,21 +554,13 @@ private:
     std::vector<ScOrcusFill> maFills;
     std::vector<ScOrcusBorder> maBorders;
     std::vector<ScOrcusProtection> maProtections;
+    std::vector<ScOrcusNumberFormat> maNumberFormats;
 
     ScOrcusImportFontStyle maFontStyle;
     ScOrcusImportFillStyle maFillStyle;
     ScOrcusImportBorderStyle maBorderStyle;
     ScOrcusImportCellProtection maCellProtection;
-
-    struct number_format
-    {
-        std::optional<OUString> maCode;
-
-        void applyToItemSet(SfxItemSet& rSet, const ScDocument& rDoc) const;
-    };
-
-    number_format maCurrentNumberFormat;
-    std::vector<number_format> maNumberFormats;
+    ScOrcusImportNumberFormat maNumberFormat;
 
     struct xf
     {

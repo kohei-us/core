@@ -1491,6 +1491,22 @@ void ScOrcusProtection::applyToItemSet( SfxItemSet& rSet ) const
     rSet.Put(ScProtectionAttr(bLocked, bFormulaHidden, bHidden, bPrintContent));
 }
 
+void ScOrcusNumberFormat::applyToItemSet( SfxItemSet& rSet, const ScDocument& rDoc ) const
+{
+    if (!maCode)
+        return;
+
+    sal_uInt32 nKey;
+    sal_Int32 nCheckPos;
+    SvNumberFormatter* pFormatter = rDoc.GetFormatTable();
+    OUString Code = *maCode; /* <-- Done because the SvNumberFormatter::PutEntry demands a non const NumFormat Code*/
+    SvNumFormatType type = SvNumFormatType::ALL;
+
+    pFormatter->PutEntry(Code, nCheckPos, type, nKey, LANGUAGE_ENGLISH_US);
+    if (!nCheckPos)
+        rSet.Put(SfxUInt32Item(ATTR_VALUE_FORMAT, nKey));
+}
+
 ScOrcusImportFontStyle::ScOrcusImportFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts ) :
     mrFactory(rFactory),
     mrFonts(rFonts)
@@ -1925,12 +1941,41 @@ std::size_t ScOrcusImportCellProtection::commit()
     return mrProtections.size() - 1;
 }
 
+ScOrcusImportNumberFormat::ScOrcusImportNumberFormat( ScOrcusFactory& rFactory, std::vector<ScOrcusNumberFormat>& rFormats ) :
+    mrFactory(rFactory), mrNumberFormats(rFormats)
+{
+}
+
+void ScOrcusImportNumberFormat::reset()
+{
+    maCurrentFormat = ScOrcusNumberFormat();
+}
+
+void ScOrcusImportNumberFormat::set_identifier(std::size_t /*id*/)
+{
+}
+
+void ScOrcusImportNumberFormat::set_code(std::string_view s)
+{
+    OUString aCode(s.data(), s.size(), mrFactory.getGlobalSettings().getTextEncoding());
+    maCurrentFormat.maCode = aCode;
+}
+
+std::size_t ScOrcusImportNumberFormat::commit()
+{
+    SAL_INFO("sc.orcus.style", "commit number format");
+    mrNumberFormats.push_back(maCurrentFormat);
+    maCurrentFormat = ScOrcusNumberFormat();
+    return mrNumberFormats.size() - 1;
+}
+
 ScOrcusStyles::ScOrcusStyles( ScOrcusFactory& rFactory, bool bSkipDefaultStyles ) :
     mrFactory(rFactory),
     maFontStyle(rFactory, maFonts),
     maFillStyle(rFactory, maFills),
     maBorderStyle(rFactory, maBorders),
-    maCellProtection(rFactory, maProtections)
+    maCellProtection(rFactory, maProtections),
+    maNumberFormat(rFactory, maNumberFormats)
 {
     ScDocument& rDoc = rFactory.getDoc().getDoc();
     if (!bSkipDefaultStyles && !rDoc.GetStyleSheetPool()->HasStandardStyles())
@@ -1948,22 +1993,6 @@ std::ostream& operator<<(std::ostream& rStrm, const Color& rColor)
 
 }
 */
-
-void ScOrcusStyles::number_format::applyToItemSet(SfxItemSet& rSet, const ScDocument& rDoc) const
-{
-    if (!maCode)
-        return;
-
-    sal_uInt32 nKey;
-    sal_Int32 nCheckPos;
-    SvNumberFormatter* pFormatter = rDoc.GetFormatTable();
-    OUString Code = *maCode; /* <-- Done because the SvNumberFormatter::PutEntry demands a non const NumFormat Code*/
-    SvNumFormatType type = SvNumFormatType::ALL;
-
-    pFormatter->PutEntry(Code, nCheckPos, type, nKey, LANGUAGE_ENGLISH_US);
-    if (!nCheckPos)
-        rSet.Put(SfxUInt32Item(ATTR_VALUE_FORMAT, nKey));
-}
 
 ScOrcusStyles::xf::xf():
     mnFontId(0),
@@ -2030,10 +2059,10 @@ void ScOrcusStyles::applyXfToItemSet(SfxItemSet& rSet, const xf& rXf)
         SAL_WARN("sc.orcus.style", "invalid number format id");
         return;
     }
-    const number_format& rFormat = maNumberFormats[nNumberFormatId];
+    const ScOrcusNumberFormat& rFormat = maNumberFormats[nNumberFormatId];
     rFormat.applyToItemSet(rSet, mrFactory.getDoc().getDoc());
 
-    if(rXf.mbAlignment)
+    if (rXf.mbAlignment)
     {
         rSet.Put(SvxHorJustifyItem(rXf.meHorAlignment, ATTR_HOR_JUSTIFY));
         rSet.Put(SvxVerJustifyItem(rXf.meVerAlignment, ATTR_VER_JUSTIFY));
@@ -2083,7 +2112,8 @@ os::iface::import_cell_protection* ScOrcusStyles::start_cell_protection()
 
 os::iface::import_number_format* ScOrcusStyles::start_number_format()
 {
-    return nullptr; // TODO: implement this
+    maNumberFormat.reset();
+    return &maNumberFormat;
 }
 
 os::iface::import_xf* ScOrcusStyles::start_xf(os::xf_category_t cat)
@@ -2123,51 +2153,6 @@ void ScOrcusStyles::set_cell_style_count(size_t /*n*/)
 }
 
 #else
-
-// fill
-
-void ScOrcusStyles::set_fill_pattern_type(os::fill_pattern_t fp)
-{
-    maCurrentFill.mePattern = fp;
-}
-
-void ScOrcusStyles::set_fill_fg_color(
-    os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
-{
-    maCurrentFill.maFgColor = Color(ColorAlpha, alpha, red, green, blue);
-}
-
-void ScOrcusStyles::set_fill_bg_color(
-    os::color_elem_t alpha, os::color_elem_t red, os::color_elem_t green, os::color_elem_t blue)
-{
-    maCurrentFill.maBgColor = Color(ColorAlpha, alpha, red, green, blue);
-}
-
-size_t ScOrcusStyles::commit_fill()
-{
-    SAL_INFO("sc.orcus.style", "commit fill");
-    maFills.push_back(maCurrentFill);
-    maCurrentFill = ScOrcusStyles::fill();
-    return maFills.size() - 1;
-}
-
-void ScOrcusStyles::set_number_format_identifier(size_t)
-{
-}
-
-void ScOrcusStyles::set_number_format_code(std::string_view s)
-{
-    OUString aCode(s.data(), s.size(), mrFactory.getGlobalSettings().getTextEncoding());
-    maCurrentNumberFormat.maCode = aCode;
-}
-
-size_t ScOrcusStyles::commit_number_format()
-{
-    SAL_INFO("sc.orcus.style", "commit number format");
-    maNumberFormats.push_back(maCurrentNumberFormat);
-    maCurrentNumberFormat = ScOrcusStyles::number_format();
-    return maNumberFormats.size() - 1;
-}
 
 // cell style xf
 

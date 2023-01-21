@@ -1417,6 +1417,68 @@ void ScOrcusFill::applyToItemSet( SfxItemSet& rSet ) const
         rSet.Put(SvxBrushItem(*maFgColor, ATTR_BACKGROUND));
 }
 
+void ScOrcusBorder::applyToItemSet( SfxItemSet& rSet ) const
+{
+    auto getDirection = [](os::border_direction_t dir) -> SvxBoxItemLine
+    {
+        switch (dir)
+        {
+            case os::border_direction_t::right:
+                return SvxBoxItemLine::RIGHT;
+            case os::border_direction_t::left:
+                return SvxBoxItemLine::LEFT;
+            case os::border_direction_t::top:
+                return SvxBoxItemLine::TOP;
+            case os::border_direction_t::bottom:
+                return SvxBoxItemLine::BOTTOM;
+            default:
+                ;
+        }
+        return SvxBoxItemLine::RIGHT;
+    };
+
+    if (maBorders.empty())
+        return;
+
+    SvxBoxItem aBoxItem(ATTR_BORDER);
+    SvxLineItem aDiagonal_TLBR(ATTR_BORDER_TLBR);
+    SvxLineItem aDiagonal_BLTR(ATTR_BORDER_BLTR);
+
+    for (const auto& [dir, attrs] : maBorders)
+    {
+        SvxBoxItemLine eDir = getDirection(dir);
+
+        SvxBorderLineStyle eStyle = attrs.meStyle.value_or(SvxBorderLineStyle::SOLID);
+        Color aColor = attrs.maColor.value_or(COL_BLACK);
+        double nWidth = attrs.mnWidth.value_or(0.0);
+
+        switch (dir)
+        {
+            case os::border_direction_t::diagonal_tl_br:
+            {
+                editeng::SvxBorderLine aLine(&aColor, nWidth, eStyle);
+                aDiagonal_TLBR.SetLine(&aLine);
+                break;
+            }
+            case os::border_direction_t::diagonal_bl_tr:
+            {
+                editeng::SvxBorderLine aLine(&aColor, nWidth, eStyle);
+                aDiagonal_BLTR.SetLine(&aLine);
+                break;
+            }
+            default:
+            {
+                editeng::SvxBorderLine aLine(&aColor, nWidth, eStyle);
+                aBoxItem.SetLine(&aLine, eDir);
+            }
+        }
+    }
+
+    rSet.Put(aDiagonal_BLTR);
+    rSet.Put(aDiagonal_TLBR);
+    rSet.Put(aBoxItem);
+}
+
 ScOrcusFontStyle::ScOrcusFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts ) :
     mrFactory(rFactory),
     mrFonts(rFonts)
@@ -1712,10 +1774,114 @@ std::size_t ScOrcusFillStyle::commit()
     return mrFills.size() - 1;
 }
 
+ScOrcusBorderStyle::ScOrcusBorderStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusBorder>& rBorders ) :
+    mrFactory(rFactory), mrBorders(rBorders)
+{
+}
+
+void ScOrcusBorderStyle::set_style(
+    os::border_direction_t dir, os::border_style_t style)
+{
+    ScOrcusBorder::BorderLine& rBorderLine = maCurrentBorder.maBorders[dir];
+
+    switch (style)
+    {
+        case os::border_style_t::solid:
+            rBorderLine.meStyle = SvxBorderLineStyle::SOLID;
+            rBorderLine.mnWidth = oox::xls::API_LINE_THIN;
+            break;
+        case os::border_style_t::hair:
+            rBorderLine.meStyle = SvxBorderLineStyle::SOLID;
+            rBorderLine.mnWidth = oox::xls::API_LINE_HAIR;
+            break;
+        case os::border_style_t::medium:
+            rBorderLine.meStyle = SvxBorderLineStyle::SOLID;
+            rBorderLine.mnWidth = oox::xls::API_LINE_MEDIUM;
+            break;
+        case os::border_style_t::thick:
+            rBorderLine.meStyle = SvxBorderLineStyle::SOLID;
+            rBorderLine.mnWidth = oox::xls::API_LINE_THICK;
+            break;
+        case os::border_style_t::thin:
+            rBorderLine.meStyle = SvxBorderLineStyle::SOLID;
+            rBorderLine.mnWidth = oox::xls::API_LINE_THIN;
+            break;
+        case os::border_style_t::dash_dot:
+            rBorderLine.meStyle = SvxBorderLineStyle::DASH_DOT;
+            rBorderLine.mnWidth = oox::xls::API_LINE_THIN;
+            break;
+        case os::border_style_t::dash_dot_dot:
+            rBorderLine.meStyle = SvxBorderLineStyle::DASH_DOT_DOT;
+            rBorderLine.mnWidth = oox::xls::API_LINE_THIN;
+            break;
+        case os::border_style_t::dashed:
+            rBorderLine.meStyle = SvxBorderLineStyle::DASHED;
+            rBorderLine.mnWidth = oox::xls::API_LINE_THIN;
+            break;
+        case os::border_style_t::dotted:
+            rBorderLine.meStyle = SvxBorderLineStyle::DOTTED;
+            rBorderLine.mnWidth = oox::xls::API_LINE_THIN;
+            break;
+        case os::border_style_t::double_border:
+            rBorderLine.meStyle = SvxBorderLineStyle::DOUBLE;
+            rBorderLine.mnWidth = oox::xls::API_LINE_THICK;
+            break;
+        case os::border_style_t::medium_dash_dot:
+        case os::border_style_t::slant_dash_dot:
+            rBorderLine.meStyle = SvxBorderLineStyle::DASH_DOT;
+            rBorderLine.mnWidth = oox::xls::API_LINE_MEDIUM;
+            break;
+        case os::border_style_t::medium_dash_dot_dot:
+            rBorderLine.meStyle = SvxBorderLineStyle::DASH_DOT_DOT;
+            rBorderLine.mnWidth = oox::xls::API_LINE_MEDIUM;
+            break;
+        case os::border_style_t::medium_dashed:
+            rBorderLine.meStyle = SvxBorderLineStyle::DASHED;
+            rBorderLine.mnWidth = oox::xls::API_LINE_MEDIUM;
+            break;
+        case os::border_style_t::unknown:
+        case os::border_style_t::none:
+            rBorderLine.mnWidth = oox::xls::API_LINE_NONE;
+            break;
+        default:
+            ;
+    }
+}
+
+void ScOrcusBorderStyle::set_color(os::border_direction_t dir,
+            os::color_elem_t alpha,
+            os::color_elem_t red,
+            os::color_elem_t green,
+            os::color_elem_t blue)
+{
+    ScOrcusBorder::BorderLine& rBorderLine = maCurrentBorder.maBorders[dir];
+    rBorderLine.maColor = Color(ColorAlpha, alpha, red, green, blue);
+}
+
+void ScOrcusBorderStyle::reset()
+{
+    maCurrentBorder = ScOrcusBorder();
+}
+
+void ScOrcusBorderStyle::set_width(os::border_direction_t  dir, double val, orcus::length_unit_t unit)
+{
+    ScOrcusBorder::BorderLine& rBorderLine = maCurrentBorder.maBorders[dir];
+    rBorderLine.mnWidth = translateToInternal(val, unit);
+}
+
+std::size_t ScOrcusBorderStyle::commit()
+{
+    SAL_INFO("sc.orcus.style", "commit border");
+    mrBorders.push_back(maCurrentBorder);
+    maCurrentBorder = ScOrcusBorder();
+    return mrBorders.size() - 1;
+}
+
 ScOrcusStyles::ScOrcusStyles( ScOrcusFactory& rFactory, bool bSkipDefaultStyles ) :
     mrFactory(rFactory),
     maFontStyle(rFactory, maFonts),
-    maFillStyle(rFactory, maFills)
+    maFillStyle(rFactory, maFills),
+    maBorderStyle(rFactory, maBorders)
 {
     ScDocument& rDoc = rFactory.getDoc().getDoc();
     if (!bSkipDefaultStyles && !rDoc.GetStyleSheetPool()->HasStandardStyles())
@@ -1744,72 +1910,6 @@ void ScOrcusStyles::protection::applyToItemSet(SfxItemSet& rSet) const
     bool bFormulaHidden = mbFormulaHidden.value_or(false);
     bool bPrintContent = mbPrintContent.value_or(false);
     rSet.Put(ScProtectionAttr(bLocked, bFormulaHidden, bHidden, bPrintContent));
-}
-
-namespace {
-
-SvxBoxItemLine getDirection(os::border_direction_t dir)
-{
-    switch (dir)
-    {
-        case os::border_direction_t::right:
-            return SvxBoxItemLine::RIGHT;
-        case os::border_direction_t::left:
-            return SvxBoxItemLine::LEFT;
-        case os::border_direction_t::top:
-            return SvxBoxItemLine::TOP;
-        case os::border_direction_t::bottom:
-            return SvxBoxItemLine::BOTTOM;
-        default:
-        break;
-    }
-    return SvxBoxItemLine::RIGHT;
-}
-
-}
-
-void ScOrcusStyles::border::applyToItemSet(SfxItemSet& rSet) const
-{
-    if (maBorders.empty())
-        return;
-
-    SvxBoxItem aBoxItem(ATTR_BORDER);
-    SvxLineItem aDiagonal_TLBR(ATTR_BORDER_TLBR);
-    SvxLineItem aDiagonal_BLTR(ATTR_BORDER_BLTR);
-
-    for (const auto& [dir, attrs] : maBorders)
-    {
-        SvxBoxItemLine eDir = getDirection(dir);
-
-        SvxBorderLineStyle eStyle = attrs.meStyle.value_or(SvxBorderLineStyle::SOLID);
-        Color aColor = attrs.maColor.value_or(COL_BLACK);
-        double nWidth = attrs.mnWidth.value_or(0.0);
-
-        switch (dir)
-        {
-            case os::border_direction_t::diagonal_tl_br:
-            {
-                editeng::SvxBorderLine aLine(&aColor, nWidth, eStyle);
-                aDiagonal_TLBR.SetLine(&aLine);
-                break;
-            }
-            case os::border_direction_t::diagonal_bl_tr:
-            {
-                editeng::SvxBorderLine aLine(&aColor, nWidth, eStyle);
-                aDiagonal_BLTR.SetLine(&aLine);
-                break;
-            }
-            default:
-            {
-                editeng::SvxBorderLine aLine(&aColor, nWidth, eStyle);
-                aBoxItem.SetLine(&aLine, eDir);
-            }
-        }
-    }
-
-    rSet.Put(aDiagonal_BLTR);
-    rSet.Put(aDiagonal_TLBR);
-    rSet.Put(aBoxItem);
 }
 
 void ScOrcusStyles::number_format::applyToItemSet(SfxItemSet& rSet, const ScDocument& rDoc) const
@@ -1934,7 +2034,8 @@ os::iface::import_fill_style* ScOrcusStyles::start_fill_style()
 
 os::iface::import_border_style* ScOrcusStyles::start_border_style()
 {
-    return nullptr; // TODO: implement this
+    maBorderStyle.reset();
+    return &maBorderStyle;
 }
 
 os::iface::import_cell_protection* ScOrcusStyles::start_cell_protection()
@@ -2014,98 +2115,6 @@ size_t ScOrcusStyles::commit_fill()
 
 // border
 
-void ScOrcusStyles::set_border_style(
-    os::border_direction_t dir, os::border_style_t style)
-{
-    border::border_line& rBorder = maCurrentBorder.maBorders[dir];
-
-    switch (style)
-    {
-        case os::border_style_t::solid:
-            rBorder.meStyle = SvxBorderLineStyle::SOLID;
-            rBorder.mnWidth = oox::xls::API_LINE_THIN;
-            break;
-        case os::border_style_t::hair:
-            rBorder.meStyle = SvxBorderLineStyle::SOLID;
-            rBorder.mnWidth = oox::xls::API_LINE_HAIR;
-            break;
-        case os::border_style_t::medium:
-            rBorder.meStyle = SvxBorderLineStyle::SOLID;
-            rBorder.mnWidth = oox::xls::API_LINE_MEDIUM;
-            break;
-        case os::border_style_t::thick:
-            rBorder.meStyle = SvxBorderLineStyle::SOLID;
-            rBorder.mnWidth = oox::xls::API_LINE_THICK;
-            break;
-        case os::border_style_t::thin:
-            rBorder.meStyle = SvxBorderLineStyle::SOLID;
-            rBorder.mnWidth = oox::xls::API_LINE_THIN;
-            break;
-        case os::border_style_t::dash_dot:
-            rBorder.meStyle = SvxBorderLineStyle::DASH_DOT;
-            rBorder.mnWidth = oox::xls::API_LINE_THIN;
-            break;
-        case os::border_style_t::dash_dot_dot:
-            rBorder.meStyle = SvxBorderLineStyle::DASH_DOT_DOT;
-            rBorder.mnWidth = oox::xls::API_LINE_THIN;
-            break;
-        case os::border_style_t::dashed:
-            rBorder.meStyle = SvxBorderLineStyle::DASHED;
-            rBorder.mnWidth = oox::xls::API_LINE_THIN;
-            break;
-        case os::border_style_t::dotted:
-            rBorder.meStyle = SvxBorderLineStyle::DOTTED;
-            rBorder.mnWidth = oox::xls::API_LINE_THIN;
-            break;
-        case os::border_style_t::double_border:
-            rBorder.meStyle = SvxBorderLineStyle::DOUBLE;
-            rBorder.mnWidth = oox::xls::API_LINE_THICK;
-            break;
-        case os::border_style_t::medium_dash_dot:
-        case os::border_style_t::slant_dash_dot:
-            rBorder.meStyle = SvxBorderLineStyle::DASH_DOT;
-            rBorder.mnWidth = oox::xls::API_LINE_MEDIUM;
-            break;
-        case os::border_style_t::medium_dash_dot_dot:
-            rBorder.meStyle = SvxBorderLineStyle::DASH_DOT_DOT;
-            rBorder.mnWidth = oox::xls::API_LINE_MEDIUM;
-            break;
-        case os::border_style_t::medium_dashed:
-            rBorder.meStyle = SvxBorderLineStyle::DASHED;
-            rBorder.mnWidth = oox::xls::API_LINE_MEDIUM;
-            break;
-        case os::border_style_t::unknown:
-        case os::border_style_t::none:
-            rBorder.mnWidth = oox::xls::API_LINE_NONE;
-            break;
-        default:
-            ;
-    }
-}
-
-void ScOrcusStyles::set_border_color(os::border_direction_t dir,
-            os::color_elem_t alpha,
-            os::color_elem_t red,
-            os::color_elem_t green,
-            os::color_elem_t blue)
-{
-    border::border_line& current_line = maCurrentBorder.maBorders[dir];
-    current_line.maColor = Color(ColorAlpha, alpha, red, green, blue);
-}
-
-void ScOrcusStyles::set_border_width(os::border_direction_t  dir, double val, orcus::length_unit_t  unit )
-{
-    border::border_line& current_line = maCurrentBorder.maBorders[dir];
-    current_line.mnWidth = translateToInternal(val, unit);
-}
-
-size_t ScOrcusStyles::commit_border()
-{
-    SAL_INFO("sc.orcus.style", "commit border");
-    maBorders.push_back(maCurrentBorder);
-    maCurrentBorder = ScOrcusStyles::border();
-    return maBorders.size() - 1;
-}
 
 // cell protection
 void ScOrcusStyles::set_cell_hidden(bool b)

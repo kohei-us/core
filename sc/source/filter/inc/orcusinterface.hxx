@@ -387,6 +387,20 @@ struct ScOrcusFill
     void applyToItemSet( SfxItemSet& rSet ) const;
 };
 
+struct ScOrcusBorder
+{
+    struct BorderLine
+    {
+        std::optional<SvxBorderLineStyle> meStyle;
+        std::optional<Color> maColor;
+        std::optional<double> mnWidth;
+    };
+
+    std::map<orcus::spreadsheet::border_direction_t, BorderLine> maBorders;
+
+    void applyToItemSet( SfxItemSet& rSet ) const;
+};
+
 class ScOrcusFontStyle : public orcus::spreadsheet::iface::import_font_style
 {
     ScOrcusFont maCurrentFont;
@@ -456,6 +470,30 @@ public:
     std::size_t commit() override;
 };
 
+class ScOrcusBorderStyle : public orcus::spreadsheet::iface::import_border_style
+{
+    ScOrcusBorder maCurrentBorder;
+    ScOrcusFactory& mrFactory;
+    std::vector<ScOrcusBorder>& mrBorders;
+
+public:
+    ScOrcusBorderStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusBorder>& rBorders );
+
+    void reset();
+
+    void set_width(
+        orcus::spreadsheet::border_direction_t dir, double width, orcus::length_unit_t unit) override;
+    void set_style(
+        orcus::spreadsheet::border_direction_t dir, orcus::spreadsheet::border_style_t style) override;
+    void set_color(
+        orcus::spreadsheet::border_direction_t dir,
+        orcus::spreadsheet::color_elem_t alpha,
+        orcus::spreadsheet::color_elem_t red,
+        orcus::spreadsheet::color_elem_t green,
+        orcus::spreadsheet::color_elem_t blue) override;
+    std::size_t commit() override;
+};
+
 class ScOrcusStyles : public orcus::spreadsheet::iface::import_styles
 {
 private:
@@ -463,26 +501,11 @@ private:
 
     std::vector<ScOrcusFont> maFonts;
     std::vector<ScOrcusFill> maFills;
+    std::vector<ScOrcusBorder> maBorders;
 
     ScOrcusFontStyle maFontStyle;
     ScOrcusFillStyle maFillStyle;
-
-    struct border
-    {
-        struct border_line
-        {
-            std::optional<SvxBorderLineStyle> meStyle;
-            std::optional<Color> maColor;
-            std::optional<double> mnWidth;
-        };
-
-        std::map<orcus::spreadsheet::border_direction_t, border_line> maBorders;
-
-        void applyToItemSet(SfxItemSet& rSet) const;
-    };
-
-    border maCurrentBorder;
-    std::vector<border> maBorders;
+    ScOrcusBorderStyle maBorderStyle;
 
     struct protection
     {
@@ -565,47 +588,6 @@ public:
     virtual void set_cell_style_count(size_t n) override;
 
 #else
-    // font
-
-    virtual void set_font_bold(bool b) override;
-    virtual void set_font_italic(bool b) override;
-    virtual void set_font_name(std::string_view name) override;
-    virtual void set_font_size(double point) override;
-    virtual void set_font_underline(orcus::spreadsheet::underline_t e) override;
-    virtual void set_font_underline_width(orcus::spreadsheet::underline_width_t e) override;
-    virtual void set_font_underline_mode(orcus::spreadsheet::underline_mode_t e) override;
-    virtual void set_font_underline_type(orcus::spreadsheet::underline_type_t e) override;
-    virtual void set_font_underline_color(orcus::spreadsheet::color_elem_t alpha,
-            orcus::spreadsheet::color_elem_t red,
-            orcus::spreadsheet::color_elem_t green,
-            orcus::spreadsheet::color_elem_t blue) override;
-    virtual void set_font_color( orcus::spreadsheet::color_elem_t alpha,
-            orcus::spreadsheet::color_elem_t red,
-            orcus::spreadsheet::color_elem_t green,
-            orcus::spreadsheet::color_elem_t blue) override;
-    virtual void set_strikethrough_style(orcus::spreadsheet::strikethrough_style_t s) override;
-    virtual void set_strikethrough_type(orcus::spreadsheet::strikethrough_type_t s) override;
-    virtual void set_strikethrough_width(orcus::spreadsheet::strikethrough_width_t s) override;
-    virtual void set_strikethrough_text(orcus::spreadsheet::strikethrough_text_t s) override;
-    virtual size_t commit_font() override;
-
-    // fill
-
-    virtual void set_fill_pattern_type(orcus::spreadsheet::fill_pattern_t fp) override;
-    virtual void set_fill_fg_color(orcus::spreadsheet::color_elem_t alpha, orcus::spreadsheet::color_elem_t red, orcus::spreadsheet::color_elem_t green, orcus::spreadsheet::color_elem_t blue) override;
-    virtual void set_fill_bg_color(orcus::spreadsheet::color_elem_t alpha, orcus::spreadsheet::color_elem_t red, orcus::spreadsheet::color_elem_t green, orcus::spreadsheet::color_elem_t blue) override;
-    virtual size_t commit_fill() override;
-
-    // border
-
-    virtual void set_border_style(orcus::spreadsheet::border_direction_t dir, orcus::spreadsheet::border_style_t style) override;
-    virtual void set_border_color(orcus::spreadsheet::border_direction_t dir,
-            orcus::spreadsheet::color_elem_t alpha,
-            orcus::spreadsheet::color_elem_t red,
-            orcus::spreadsheet::color_elem_t green,
-            orcus::spreadsheet::color_elem_t blue) override;
-    virtual void set_border_width(orcus::spreadsheet::border_direction_t dir, double val, orcus::length_unit_t unit) override;
-    virtual size_t commit_border() override;
 
     // cell protection
     virtual void set_cell_hidden(bool b) override;

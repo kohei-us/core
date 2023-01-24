@@ -1514,7 +1514,9 @@ ScOrcusXf::ScOrcusXf() :
     mnProtectionId(0),
     mnNumberFormatId(0),
     mnStyleXf(0),
-    mbAlignment(false),
+    mbApplyAlignment(false),
+    mbWrapText(false),
+    mbShrinkToFit(false),
     meHorAlignment(SvxCellHorJustify::Standard),
     meVerAlignment(SvxCellVerJustify::Standard),
     meHorAlignMethod(SvxCellJustifyMethod::Auto),
@@ -1992,11 +1994,10 @@ std::size_t ScOrcusImportNumberFormat::commit()
 }
 
 ScOrucsImportCellStyle::ScOrucsImportCellStyle(
-    ScOrcusFactory& rFactory, ScOrcusStyles& rStyles,
-    const std::vector<ScOrcusXf>& rCellStyleXfs ) :
+    ScOrcusFactory& rFactory, ScOrcusStyles& rStyles, const std::vector<ScOrcusXf>& rXfs ) :
     mrFactory(rFactory),
     mrStyles(rStyles),
-    mrCellStyleXfs(rCellStyleXfs)
+    mrXfs(rXfs)
 {
 }
 
@@ -2036,7 +2037,7 @@ void ScOrucsImportCellStyle::set_parent_name(std::string_view name)
 void ScOrucsImportCellStyle::commit()
 {
     SAL_INFO("sc.orcus.style", "commit cell style: " << maCurrentStyle.maName);
-    if (maCurrentStyle.mnXFId >= mrCellStyleXfs.size())
+    if (maCurrentStyle.mnXFId >= mrXfs.size())
     {
         SAL_WARN("sc.orcus.style", "invalid xf id for commit cell style");
         return;
@@ -2053,11 +2054,127 @@ void ScOrucsImportCellStyle::commit()
             maCurrentStyle.maParentName, SfxStyleFamily::Para));
 
     SfxItemSet& rSet = rBase.GetItemSet();
-    const ScOrcusXf& rXf = mrCellStyleXfs[maCurrentStyle.mnXFId];
+    const ScOrcusXf& rXf = mrXfs[maCurrentStyle.mnXFId];
     mrStyles.applyXfToItemSet(rSet, rXf);
 
     maCurrentStyle = ScOrcusCellStyle();
 }
+
+void ScOrcusImportXf::reset( std::vector<ScOrcusXf>& rXfs )
+{
+    mpXfs = &rXfs;
+    maCurrentXf = ScOrcusXf();
+}
+
+void ScOrcusImportXf::set_font(std::size_t index)
+{
+    maCurrentXf.mnFontId = index;
+}
+
+void ScOrcusImportXf::set_fill(std::size_t index)
+{
+    maCurrentXf.mnFillId = index;
+}
+
+void ScOrcusImportXf::set_border(std::size_t index)
+{
+    maCurrentXf.mnBorderId = index;
+}
+
+void ScOrcusImportXf::set_protection(std::size_t index)
+{
+    maCurrentXf.mnProtectionId = index;
+}
+
+void ScOrcusImportXf::set_number_format(std::size_t index)
+{
+    maCurrentXf.mnNumberFormatId = index;
+}
+
+void ScOrcusImportXf::set_style_xf(std::size_t index)
+{
+    maCurrentXf.mnStyleXf = index;
+}
+
+void ScOrcusImportXf::set_apply_alignment(bool b)
+{
+    maCurrentXf.mbApplyAlignment = b;
+}
+
+void ScOrcusImportXf::set_horizontal_alignment(os::hor_alignment_t align)
+{
+    switch (align)
+    {
+        case os::hor_alignment_t::left:
+            maCurrentXf.meHorAlignment = SvxCellHorJustify::Left;
+            break;
+        case os::hor_alignment_t::right:
+            maCurrentXf.meHorAlignment = SvxCellHorJustify::Right;
+            break;
+        case os::hor_alignment_t::center:
+            maCurrentXf.meHorAlignment = SvxCellHorJustify::Center;
+            break;
+        case os::hor_alignment_t::justified:
+            maCurrentXf.meHorAlignment = SvxCellHorJustify::Block;
+            break;
+        case os::hor_alignment_t::distributed:
+            maCurrentXf.meHorAlignment = SvxCellHorJustify::Block;
+            maCurrentXf.meHorAlignMethod = SvxCellJustifyMethod::Distribute;
+            break;
+        case os::hor_alignment_t::unknown:
+            maCurrentXf.meHorAlignment = SvxCellHorJustify::Standard;
+            break;
+        default:
+            ;
+    }
+    maCurrentXf.mbApplyAlignment = true;
+}
+
+void ScOrcusImportXf::set_vertical_alignment(os::ver_alignment_t align)
+{
+    switch (align)
+    {
+        case os::ver_alignment_t::top:
+            maCurrentXf.meVerAlignment = SvxCellVerJustify::Top;
+            break;
+        case os::ver_alignment_t::bottom:
+            maCurrentXf.meVerAlignment = SvxCellVerJustify::Bottom;
+            break;
+        case os::ver_alignment_t::middle:
+            maCurrentXf.meVerAlignment = SvxCellVerJustify::Center;
+            break;
+        case os::ver_alignment_t::justified:
+            maCurrentXf.meVerAlignment = SvxCellVerJustify::Block;
+            break;
+        case os::ver_alignment_t::distributed:
+            maCurrentXf.meVerAlignment = SvxCellVerJustify::Block;
+            maCurrentXf.meVerAlignMethod = SvxCellJustifyMethod::Distribute;
+            break;
+        case os::ver_alignment_t::unknown:
+            maCurrentXf.meVerAlignment = SvxCellVerJustify::Standard;
+            break;
+        default:
+            ;
+    }
+    maCurrentXf.mbApplyAlignment = true;
+}
+
+void ScOrcusImportXf::set_wrap_text(bool b)
+{
+    maCurrentXf.mbWrapText = b;
+}
+
+void ScOrcusImportXf::set_shrink_to_fit(bool b)
+{
+    maCurrentXf.mbShrinkToFit = b;
+}
+
+std::size_t ScOrcusImportXf::commit()
+{
+    mpXfs->push_back(maCurrentXf);
+    return mpXfs->size() - 1;
+}
+
 
 ScOrcusStyles::ScOrcusStyles( ScOrcusFactory& rFactory, bool bSkipDefaultStyles ) :
     mrFactory(rFactory),
@@ -2131,7 +2248,7 @@ void ScOrcusStyles::applyXfToItemSet( SfxItemSet& rSet, const ScOrcusXf& rXf )
     const ScOrcusNumberFormat& rFormat = maNumberFormats[nNumberFormatId];
     rFormat.applyToItemSet(rSet, mrFactory.getDoc().getDoc());
 
-    if (rXf.mbAlignment)
+    if (rXf.mbApplyAlignment)
     {
         rSet.Put(SvxHorJustifyItem(rXf.meHorAlignment, ATTR_HOR_JUSTIFY));
         rSet.Put(SvxVerJustifyItem(rXf.meVerAlignment, ATTR_VER_JUSTIFY));
@@ -2140,7 +2257,7 @@ void ScOrcusStyles::applyXfToItemSet( SfxItemSet& rSet, const ScOrcusXf& rXf )
     }
 }
 
-void ScOrcusStyles::applyXfToItemSet(SfxItemSet& rSet, size_t xfId)
+void ScOrcusStyles::applyXfToItemSet( SfxItemSet& rSet, std::size_t xfId )
 {
     SAL_INFO("sc.orcus.style", "applyXfToitemSet: " << xfId);
     if (maCellXfs.size() <= xfId)
@@ -2151,8 +2268,6 @@ void ScOrcusStyles::applyXfToItemSet(SfxItemSet& rSet, size_t xfId)
 
     applyXfToItemSet(rSet, maCellXfs[xfId]);
 }
-
-#if 1
 
 os::iface::import_font_style* ScOrcusStyles::start_font_style()
 {
@@ -2186,8 +2301,23 @@ os::iface::import_number_format* ScOrcusStyles::start_number_format()
 
 os::iface::import_xf* ScOrcusStyles::start_xf(os::xf_category_t cat)
 {
-    (void)cat;
-    return nullptr; // TODO: implement this
+    switch (cat)
+    {
+        case os::xf_category_t::cell:
+            maXf.reset(maCellXfs);
+            break;
+        case os::xf_category_t::cell_style:
+            maXf.reset(maCellStyleXfs);
+            break;
+        case os::xf_category_t::differential:
+            maXf.reset(maCellDiffXfs);
+            break;
+        case os::xf_category_t::unknown:
+            SAL_WARN("sc.orcus.style", "unknown xf category");
+            return nullptr;
+    }
+
+    return &maXf;
 }
 
 os::iface::import_cell_style* ScOrcusStyles::start_cell_style()
@@ -2219,129 +2349,6 @@ void ScOrcusStyles::set_xf_count(os::xf_category_t /*cat*/, size_t /*n*/)
 void ScOrcusStyles::set_cell_style_count(size_t /*n*/)
 {
 }
-
-#else
-
-// cell style xf
-
-size_t ScOrcusStyles::commit_cell_style_xf()
-{
-    SAL_INFO("sc.orcus.style", "commit cell style xf");
-    maCellStyleXfs.push_back(maCurrentXF);
-    return maCellStyleXfs.size() - 1;
-}
-
-// cell xf
-
-size_t ScOrcusStyles::commit_cell_xf()
-{
-    SAL_INFO("sc.orcus.style", "commit cell xf");
-    maCellXfs.push_back(maCurrentXF);
-    return maCellXfs.size() - 1;
-}
-
-// dxf
-
-size_t ScOrcusStyles::commit_dxf()
-{
-    return 0;
-}
-
-// xf (cell format) - used both by cell xf and cell style xf.
-
-void ScOrcusStyles::set_xf_number_format(size_t index)
-{
-    maCurrentXF.mnNumberFormatId = index;
-}
-
-void ScOrcusStyles::set_xf_font(size_t index)
-{
-    maCurrentXF.mnFontId = index;
-}
-
-void ScOrcusStyles::set_xf_fill(size_t index)
-{
-    maCurrentXF.mnFillId = index;
-}
-
-void ScOrcusStyles::set_xf_border(size_t index)
-{
-    maCurrentXF.mnBorderId = index;
-}
-
-void ScOrcusStyles::set_xf_protection(size_t index)
-{
-    maCurrentXF.mnProtectionId = index;
-}
-
-void ScOrcusStyles::set_xf_style_xf(size_t index)
-{
-    maCurrentXF.mnStyleXf = index;
-}
-
-void ScOrcusStyles::set_xf_apply_alignment(bool /*b*/)
-{
-}
-
-void ScOrcusStyles::set_xf_horizontal_alignment(os::hor_alignment_t align)
-{
-    switch (align)
-    {
-        case os::hor_alignment_t::left:
-            maCurrentXF.meHorAlignment = SvxCellHorJustify::Left;
-            break;
-        case os::hor_alignment_t::right:
-            maCurrentXF.meHorAlignment = SvxCellHorJustify::Right;
-            break;
-        case os::hor_alignment_t::center:
-            maCurrentXF.meHorAlignment = SvxCellHorJustify::Center;
-            break;
-        case os::hor_alignment_t::justified:
-            maCurrentXF.meHorAlignment = SvxCellHorJustify::Block;
-            break;
-        case os::hor_alignment_t::distributed:
-            maCurrentXF.meHorAlignment = SvxCellHorJustify::Block;
-            maCurrentXF.meHorAlignMethod = SvxCellJustifyMethod::Distribute;
-            break;
-        case os::hor_alignment_t::unknown:
-            maCurrentXF.meHorAlignment = SvxCellHorJustify::Standard;
-            break;
-        default:
-            ;
-    }
-    maCurrentXF.mbAlignment = true;
-}
-
-void ScOrcusStyles::set_xf_vertical_alignment(os::ver_alignment_t align)
-{
-    switch (align)
-    {
-        case os::ver_alignment_t::top:
-            maCurrentXF.meVerAlignment = SvxCellVerJustify::Top;
-            break;
-        case os::ver_alignment_t::bottom:
-            maCurrentXF.meVerAlignment = SvxCellVerJustify::Bottom;
-            break;
-        case os::ver_alignment_t::middle:
-            maCurrentXF.meVerAlignment = SvxCellVerJustify::Center;
-            break;
-        case os::ver_alignment_t::justified:
-            maCurrentXF.meVerAlignment = SvxCellVerJustify::Block;
-            break;
-        case os::ver_alignment_t::distributed:
-            maCurrentXF.meVerAlignment = SvxCellVerJustify::Block;
-            maCurrentXF.meVerAlignMethod = SvxCellJustifyMethod::Distribute;
-            break;
-        case os::ver_alignment_t::unknown:
-            maCurrentXF.meVerAlignment = SvxCellVerJustify::Standard;
-            break;
-        default:
-            ;
-    }
-    maCurrentXF.mbAlignment = true;
-}
-
-#endif
 
 // auto filter import
 

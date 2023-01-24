@@ -420,13 +420,16 @@ struct ScOrcusNumberFormat
 
 struct ScOrcusXf
 {
-    size_t mnFontId;
-    size_t mnFillId;
-    size_t mnBorderId;
-    size_t mnProtectionId;
-    size_t mnNumberFormatId;
-    size_t mnStyleXf;
-    bool mbAlignment;
+    std::size_t mnFontId;
+    std::size_t mnFillId;
+    std::size_t mnBorderId;
+    std::size_t mnProtectionId;
+    std::size_t mnNumberFormatId;
+    std::size_t mnStyleXf;
+
+    bool mbApplyAlignment;
+    bool mbWrapText;
+    bool mbShrinkToFit;
 
     SvxCellHorJustify meHorAlignment;
     SvxCellVerJustify meVerAlignment;
@@ -579,13 +582,11 @@ class ScOrucsImportCellStyle : public orcus::spreadsheet::iface::import_cell_sty
     ScOrcusCellStyle maCurrentStyle;
     ScOrcusFactory& mrFactory;
     ScOrcusStyles& mrStyles;
-    const std::vector<ScOrcusXf>& mrCellStyleXfs;
+    const std::vector<ScOrcusXf>& mrXfs;
 
 public:
     ScOrucsImportCellStyle(
-        ScOrcusFactory& rFactory, ScOrcusStyles& rStyles,
-        const std::vector<ScOrcusXf>& rCellStyleXfs
-    );
+        ScOrcusFactory& rFactory, ScOrcusStyles& rStyles, const std::vector<ScOrcusXf>& rXfs );
 
     void reset();
 
@@ -595,6 +596,28 @@ public:
     void set_builtin(std::size_t index) override;
     void set_parent_name(std::string_view s) override;
     void commit() override;
+};
+
+class ScOrcusImportXf : public orcus::spreadsheet::iface::import_xf
+{
+    ScOrcusXf maCurrentXf;
+    std::vector<ScOrcusXf>* mpXfs = nullptr;
+
+public:
+    void reset( std::vector<ScOrcusXf>& rXfs );
+
+    void set_font(std::size_t index) override;
+    void set_fill(std::size_t index) override;
+    void set_border(std::size_t index) override;
+    void set_protection(std::size_t index) override;
+    void set_number_format(std::size_t index) override;
+    void set_style_xf(std::size_t index) override;
+    void set_apply_alignment(bool b) override;
+    void set_horizontal_alignment(orcus::spreadsheet::hor_alignment_t align) override;
+    void set_vertical_alignment(orcus::spreadsheet::ver_alignment_t align) override;
+    void set_wrap_text(bool b) override;
+    void set_shrink_to_fit(bool b) override;
+    std::size_t commit() override;
 };
 
 class ScOrcusStyles : public orcus::spreadsheet::iface::import_styles
@@ -617,14 +640,14 @@ private:
     ScOrcusImportCellProtection maCellProtection;
     ScOrcusImportNumberFormat maNumberFormat;
     ScOrucsImportCellStyle maCellStyle;
+    ScOrcusImportXf maXf;
 
 public:
     ScOrcusStyles( ScOrcusFactory& rFactory, bool bSkipDefaultStyles=false );
 
     void applyXfToItemSet( SfxItemSet& rSet, const ScOrcusXf& rXf );
-    void applyXfToItemSet(SfxItemSet& rSet, size_t xfId);
+    void applyXfToItemSet( SfxItemSet& rSet, std::size_t xfId );
 
-#if 1
     virtual orcus::spreadsheet::iface::import_font_style* start_font_style() override;
     virtual orcus::spreadsheet::iface::import_fill_style* start_fill_style() override;
     virtual orcus::spreadsheet::iface::import_border_style* start_border_style() override;
@@ -639,32 +662,6 @@ public:
     virtual void set_number_format_count(size_t n) override;
     virtual void set_xf_count(orcus::spreadsheet::xf_category_t cat, size_t n) override;
     virtual void set_cell_style_count(size_t n) override;
-
-#else
-
-    // cell style xf
-
-    virtual size_t commit_cell_style_xf() override;
-
-    // cell xf
-
-    virtual size_t commit_cell_xf() override;
-
-    // dxf
-    virtual size_t commit_dxf() override;
-
-    // xf (cell format) - used both by cell xf and cell style xf.
-
-    virtual void set_xf_number_format(size_t index) override;
-    virtual void set_xf_font(size_t index) override;
-    virtual void set_xf_fill(size_t index) override;
-    virtual void set_xf_border(size_t index) override;
-    virtual void set_xf_protection(size_t index) override;
-    virtual void set_xf_style_xf(size_t index) override;
-    virtual void set_xf_apply_alignment(bool b) override;
-    virtual void set_xf_horizontal_alignment(orcus::spreadsheet::hor_alignment_t align) override;
-    virtual void set_xf_vertical_alignment(orcus::spreadsheet::ver_alignment_t align) override;
-#endif
 };
 
 class ScOrcusFactory : public orcus::spreadsheet::iface::import_factory

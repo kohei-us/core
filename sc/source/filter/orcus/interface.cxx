@@ -1507,6 +1507,28 @@ void ScOrcusNumberFormat::applyToItemSet( SfxItemSet& rSet, const ScDocument& rD
         rSet.Put(SfxUInt32Item(ATTR_VALUE_FORMAT, nKey));
 }
 
+ScOrcusXf::ScOrcusXf() :
+    mnFontId(0),
+    mnFillId(0),
+    mnBorderId(0),
+    mnProtectionId(0),
+    mnNumberFormatId(0),
+    mnStyleXf(0),
+    mbAlignment(false),
+    meHorAlignment(SvxCellHorJustify::Standard),
+    meVerAlignment(SvxCellVerJustify::Standard),
+    meHorAlignMethod(SvxCellJustifyMethod::Auto),
+    meVerAlignMethod(SvxCellJustifyMethod::Auto)
+{
+}
+
+ScOrcusCellStyle::ScOrcusCellStyle() :
+    maParentName(SC_STYLE_PROG_STANDARD),
+    mnXFId(0),
+    mnBuiltInId(0)
+{
+}
+
 ScOrcusImportFontStyle::ScOrcusImportFontStyle( ScOrcusFactory& rFactory, std::vector<ScOrcusFont>& rFonts ) :
     mrFactory(rFactory),
     mrFonts(rFonts)
@@ -1969,13 +1991,82 @@ std::size_t ScOrcusImportNumberFormat::commit()
     return mrNumberFormats.size() - 1;
 }
 
+ScOrucsImportCellStyle::ScOrucsImportCellStyle(
+    ScOrcusFactory& rFactory, ScOrcusStyles& rStyles,
+    const std::vector<ScOrcusXf>& rCellStyleXfs ) :
+    mrFactory(rFactory),
+    mrStyles(rStyles),
+    mrCellStyleXfs(rCellStyleXfs)
+{
+}
+
+void ScOrucsImportCellStyle::reset()
+{
+    maCurrentStyle = ScOrcusCellStyle();
+}
+
+void ScOrucsImportCellStyle::set_name(std::string_view name)
+{
+    OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
+    maCurrentStyle.maName = aName;
+}
+
+void ScOrucsImportCellStyle::set_display_name(std::string_view name)
+{
+    OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
+    maCurrentStyle.maDisplayName = aName;
+}
+
+void ScOrucsImportCellStyle::set_xf(size_t index)
+{
+    maCurrentStyle.mnXFId = index;
+}
+
+void ScOrucsImportCellStyle::set_builtin(size_t index)
+{
+    maCurrentStyle.mnBuiltInId = index;
+}
+
+void ScOrucsImportCellStyle::set_parent_name(std::string_view name)
+{
+    const OUString aParentName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
+    maCurrentStyle.maParentName = aParentName;
+}
+
+void ScOrucsImportCellStyle::commit()
+{
+    SAL_INFO("sc.orcus.style", "commit cell style: " << maCurrentStyle.maName);
+    if (maCurrentStyle.mnXFId >= mrCellStyleXfs.size())
+    {
+        SAL_WARN("sc.orcus.style", "invalid xf id for commit cell style");
+        return;
+    }
+
+    if (maCurrentStyle.mnXFId == 0)
+        return;
+
+    ScStyleSheetPool* pPool = mrFactory.getDoc().getDoc().GetStyleSheetPool();
+    SfxStyleSheetBase& rBase = pPool->Make(maCurrentStyle.maName, SfxStyleFamily::Para);
+    // Need to convert the parent name to localized UI name, see tdf#139205.
+    rBase.SetParent(
+        ScStyleNameConversion::ProgrammaticToDisplayName(
+            maCurrentStyle.maParentName, SfxStyleFamily::Para));
+
+    SfxItemSet& rSet = rBase.GetItemSet();
+    const ScOrcusXf& rXf = mrCellStyleXfs[maCurrentStyle.mnXFId];
+    mrStyles.applyXfToItemSet(rSet, rXf);
+
+    maCurrentStyle = ScOrcusCellStyle();
+}
+
 ScOrcusStyles::ScOrcusStyles( ScOrcusFactory& rFactory, bool bSkipDefaultStyles ) :
     mrFactory(rFactory),
     maFontStyle(rFactory, maFonts),
     maFillStyle(rFactory, maFills),
     maBorderStyle(rFactory, maBorders),
     maCellProtection(rFactory, maProtections),
-    maNumberFormat(rFactory, maNumberFormats)
+    maNumberFormat(rFactory, maNumberFormats),
+    maCellStyle(rFactory, *this, maCellStyleXfs)
 {
     ScDocument& rDoc = rFactory.getDoc().getDoc();
     if (!bSkipDefaultStyles && !rDoc.GetStyleSheetPool()->HasStandardStyles())
@@ -1994,29 +2085,7 @@ std::ostream& operator<<(std::ostream& rStrm, const Color& rColor)
 }
 */
 
-ScOrcusStyles::xf::xf():
-    mnFontId(0),
-    mnFillId(0),
-    mnBorderId(0),
-    mnProtectionId(0),
-    mnNumberFormatId(0),
-    mnStyleXf(0),
-    mbAlignment(false),
-    meHorAlignment(SvxCellHorJustify::Standard),
-    meVerAlignment(SvxCellVerJustify::Standard),
-    meHorAlignMethod(SvxCellJustifyMethod::Auto),
-    meVerAlignMethod(SvxCellJustifyMethod::Auto)
-{
-}
-
-ScOrcusStyles::cell_style::cell_style():
-    maParentName(OUString(SC_STYLE_PROG_STANDARD)),
-    mnXFId(0),
-    mnBuiltInId(0)
-{
-}
-
-void ScOrcusStyles::applyXfToItemSet(SfxItemSet& rSet, const xf& rXf)
+void ScOrcusStyles::applyXfToItemSet( SfxItemSet& rSet, const ScOrcusXf& rXf )
 {
     size_t nFontId = rXf.mnFontId;
     if (nFontId >= maFonts.size())
@@ -2080,8 +2149,7 @@ void ScOrcusStyles::applyXfToItemSet(SfxItemSet& rSet, size_t xfId)
         return;
     }
 
-    const xf& rXf = maCellXfs[xfId];
-    applyXfToItemSet(rSet, rXf);
+    applyXfToItemSet(rSet, maCellXfs[xfId]);
 }
 
 #if 1
@@ -2124,9 +2192,9 @@ os::iface::import_xf* ScOrcusStyles::start_xf(os::xf_category_t cat)
 
 os::iface::import_cell_style* ScOrcusStyles::start_cell_style()
 {
-    return nullptr; // TODO: implement this
+    maCellStyle.reset();
+    return &maCellStyle;
 }
-
 
 void ScOrcusStyles::set_font_count(size_t /*n*/)
 {
@@ -2271,61 +2339,6 @@ void ScOrcusStyles::set_xf_vertical_alignment(os::ver_alignment_t align)
             ;
     }
     maCurrentXF.mbAlignment = true;
-}
-
-// cell style entry
-// not needed for now for gnumeric
-
-void ScOrcusStyles::set_cell_style_name(std::string_view name)
-{
-    OUString aName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
-    maCurrentCellStyle.maName = aName;
-}
-
-void ScOrcusStyles::set_cell_style_xf(size_t index)
-{
-    maCurrentCellStyle.mnXFId = index;
-}
-
-void ScOrcusStyles::set_cell_style_builtin(size_t index)
-{
-    // not needed for gnumeric
-    maCurrentCellStyle.mnBuiltInId = index;
-}
-
-void ScOrcusStyles::set_cell_style_parent_name(std::string_view name)
-{
-    const OUString aParentName(name.data(), name.size(), mrFactory.getGlobalSettings().getTextEncoding());
-    maCurrentCellStyle.maParentName = aParentName;
-}
-
-size_t ScOrcusStyles::commit_cell_style()
-{
-    SAL_INFO("sc.orcus.style", "commit cell style: " << maCurrentCellStyle.maName);
-    if (maCurrentCellStyle.mnXFId >= maCellStyleXfs.size())
-    {
-        SAL_WARN("sc.orcus.style", "invalid xf id for commit cell style");
-        return 0;
-    }
-    if (maCurrentCellStyle.mnXFId == 0)
-    {
-        return 0;
-    }
-
-    ScStyleSheetPool* pPool = mrFactory.getDoc().getDoc().GetStyleSheetPool();
-    SfxStyleSheetBase& rBase = pPool->Make(maCurrentCellStyle.maName, SfxStyleFamily::Para);
-    // Need to convert the parent name to localized UI name, see tdf#139205.
-    rBase.SetParent(ScStyleNameConversion::ProgrammaticToDisplayName(maCurrentCellStyle.maParentName,
-                                                                     SfxStyleFamily::Para));
-    SfxItemSet& rSet = rBase.GetItemSet();
-
-    xf& rXf = maCellStyleXfs[maCurrentCellStyle.mnXFId];
-    applyXfToItemSet(rSet, rXf);
-
-    maCurrentXF = ScOrcusStyles::xf();
-    maCurrentCellStyle = ScOrcusStyles::cell_style();
-
-    return 0;
 }
 
 #endif

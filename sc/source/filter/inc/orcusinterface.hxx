@@ -418,6 +418,35 @@ struct ScOrcusNumberFormat
     void applyToItemSet( SfxItemSet& rSet, const ScDocument& rDoc ) const;
 };
 
+struct ScOrcusXf
+{
+    size_t mnFontId;
+    size_t mnFillId;
+    size_t mnBorderId;
+    size_t mnProtectionId;
+    size_t mnNumberFormatId;
+    size_t mnStyleXf;
+    bool mbAlignment;
+
+    SvxCellHorJustify meHorAlignment;
+    SvxCellVerJustify meVerAlignment;
+    SvxCellJustifyMethod meHorAlignMethod;
+    SvxCellJustifyMethod meVerAlignMethod;
+
+    ScOrcusXf();
+};
+
+struct ScOrcusCellStyle
+{
+    OUString maName;
+    OUString maDisplayName;
+    OUString maParentName;
+    std::size_t mnXFId;
+    std::size_t mnBuiltInId;
+
+    ScOrcusCellStyle();
+};
+
 class ScOrcusImportFontStyle : public orcus::spreadsheet::iface::import_font_style
 {
     ScOrcusFont maCurrentFont;
@@ -545,6 +574,29 @@ public:
     std::size_t commit() override;
 };
 
+class ScOrucsImportCellStyle : public orcus::spreadsheet::iface::import_cell_style
+{
+    ScOrcusCellStyle maCurrentStyle;
+    ScOrcusFactory& mrFactory;
+    ScOrcusStyles& mrStyles;
+    const std::vector<ScOrcusXf>& mrCellStyleXfs;
+
+public:
+    ScOrucsImportCellStyle(
+        ScOrcusFactory& rFactory, ScOrcusStyles& rStyles,
+        const std::vector<ScOrcusXf>& rCellStyleXfs
+    );
+
+    void reset();
+
+    void set_name(std::string_view s) override;
+    void set_display_name(std::string_view s) override;
+    void set_xf(std::size_t index) override;
+    void set_builtin(std::size_t index) override;
+    void set_parent_name(std::string_view s) override;
+    void commit() override;
+};
+
 class ScOrcusStyles : public orcus::spreadsheet::iface::import_styles
 {
 private:
@@ -555,52 +607,21 @@ private:
     std::vector<ScOrcusBorder> maBorders;
     std::vector<ScOrcusProtection> maProtections;
     std::vector<ScOrcusNumberFormat> maNumberFormats;
+    std::vector<ScOrcusXf> maCellXfs;
+    std::vector<ScOrcusXf> maCellStyleXfs;
+    std::vector<ScOrcusXf> maCellDiffXfs;
 
     ScOrcusImportFontStyle maFontStyle;
     ScOrcusImportFillStyle maFillStyle;
     ScOrcusImportBorderStyle maBorderStyle;
     ScOrcusImportCellProtection maCellProtection;
     ScOrcusImportNumberFormat maNumberFormat;
-
-    struct xf
-    {
-        size_t mnFontId;
-        size_t mnFillId;
-        size_t mnBorderId;
-        size_t mnProtectionId;
-        size_t mnNumberFormatId;
-        size_t mnStyleXf;
-        bool mbAlignment;
-
-        SvxCellHorJustify meHorAlignment;
-        SvxCellVerJustify meVerAlignment;
-        SvxCellJustifyMethod meHorAlignMethod;
-        SvxCellJustifyMethod meVerAlignMethod;
-
-        xf();
-    };
-
-    xf maCurrentXF;
-    std::vector<xf> maCellStyleXfs;
-    std::vector<xf> maCellXfs;
-
-    struct cell_style
-    {
-        OUString maName;
-        OUString maParentName;
-        size_t mnXFId;
-        size_t mnBuiltInId;
-
-        cell_style();
-    };
-
-    cell_style maCurrentCellStyle;
-
-    void applyXfToItemSet(SfxItemSet& rSet, const xf& rXf);
+    ScOrucsImportCellStyle maCellStyle;
 
 public:
     ScOrcusStyles( ScOrcusFactory& rFactory, bool bSkipDefaultStyles=false );
 
+    void applyXfToItemSet( SfxItemSet& rSet, const ScOrcusXf& rXf );
     void applyXfToItemSet(SfxItemSet& rSet, size_t xfId);
 
 #if 1
@@ -643,14 +664,6 @@ public:
     virtual void set_xf_apply_alignment(bool b) override;
     virtual void set_xf_horizontal_alignment(orcus::spreadsheet::hor_alignment_t align) override;
     virtual void set_xf_vertical_alignment(orcus::spreadsheet::ver_alignment_t align) override;
-
-    // cell style entry
-
-    virtual void set_cell_style_name(std::string_view name) override;
-    virtual void set_cell_style_xf(size_t index) override;
-    virtual void set_cell_style_builtin(size_t index) override;
-    virtual void set_cell_style_parent_name(std::string_view name) override;
-    virtual size_t commit_cell_style() override;
 #endif
 };
 

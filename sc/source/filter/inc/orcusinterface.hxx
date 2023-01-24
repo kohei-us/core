@@ -428,8 +428,8 @@ struct ScOrcusXf
     std::size_t mnStyleXf;
 
     bool mbApplyAlignment;
-    bool mbWrapText;
-    bool mbShrinkToFit;
+    std::optional<bool> mbWrapText;
+    std::optional<bool> mbShrinkToFit;
 
     SvxCellHorJustify meHorAlignment;
     SvxCellVerJustify meVerAlignment;

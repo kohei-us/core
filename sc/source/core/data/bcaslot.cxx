@@ -29,11 +29,8 @@
 #include <refupdat.hxx>
 #include <bulkdatahint.hxx>
 #include <columnspanset.hxx>
-
-#if DEBUG_AREA_BROADCASTER
 #include <formulacell.hxx>
 #include <grouparealistener.hxx>
-#endif
 
 ScBroadcastArea::ScBroadcastArea( const ScRange& rRange ) :
     pUpdateChainNext(nullptr),
@@ -496,6 +493,43 @@ void ScBroadcastAreaSlot::GetAllListeners(
             aEntry.mbGroupListening = pArea->IsGroupListening();
             aEntry.mpListener = pListener;
             rListeners.push_back(aEntry);
+        }
+    }
+}
+
+void ScBroadcastAreaSlot::DumpBroadcasterState() const
+{
+    constexpr ScRefFlags nPosFlags = ScRefFlags::VALID | ScRefFlags::TAB_3D;
+
+    for (const ScBroadcastAreaEntry& rEntry : aBroadcastAreaTbl)
+    {
+        const auto& rLis = rEntry.mpArea->GetBroadcaster().GetAllListeners();
+        std::cout << "    range: " << rEntry.mpArea->GetRange().Format(*pDoc, nPosFlags) << std::endl;
+        std::cout << "    group-listening: " << rEntry.mpArea->IsGroupListening() << std::endl;
+        std::cout << "    listener-count: " << rLis.size() << std::endl;
+
+        for (const SvtListener* pLis : rLis)
+        {
+            if (auto pFC = dynamic_cast<const ScFormulaCell*>(pLis); pFC)
+            {
+                std::cout << "      listener: formula-cell: " << pFC->aPos.Format(nPosFlags, pDoc) << std::endl;
+                continue;
+            }
+
+
+            if (auto pFGL = dynamic_cast<const sc::FormulaGroupAreaListener*>(pLis); pFGL)
+            {
+                auto pTopCell = pFGL->getTopCell();
+                if (auto xFG = pTopCell->GetCellGroup(); xFG)
+                {
+                    ScRange aGR(pTopCell->aPos);
+                    aGR.aEnd.IncRow(xFG->mnLength - 1);
+                    std::cout << "      listener: formula-group: " << aGR.Format(*pDoc, nPosFlags) << std::endl;
+                }
+                continue;
+            }
+
+            std::cout << "      listener: unknown" << std::endl;
         }
     }
 }
@@ -1281,6 +1315,28 @@ std::vector<sc::AreaListener> ScBroadcastAreaSlotMachine::GetAllListeners(
     }
 
     return aRet;
+}
+
+void ScBroadcastAreaSlotMachine::DumpBroadcasterState() const
+{
+    std::cout << "slot distribution count: " << maSlotDistribution.size() << std::endl;
+    std::cout << "bca slots: " << mnBcaSlots << "; bca slots column: " << mnBcaSlotsCol << std::endl;
+
+    for (const auto& [rTab, rTabSlots] : aTableSlotsMap)
+    {
+        std::cout << "sheet: index=" << rTab << std::endl;
+
+        ScBroadcastAreaSlot** pp = rTabSlots.getSlots();
+        for (SCSIZE i = 0; i < mnBcaSlots; ++i)
+        {
+            const ScBroadcastAreaSlot* pSlot = pp[i];
+            if (pSlot)
+            {
+                std::cout << "  slot " << i << std::endl;
+                pSlot->DumpBroadcasterState();
+            }
+        }
+    }
 }
 
 #if DEBUG_AREA_BROADCASTER

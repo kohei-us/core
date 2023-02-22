@@ -73,7 +73,49 @@
 
 #include <comphelper/lok.hxx>
 #include <sfx2/lokhelper.hxx>
+#include <iostream>
+#include <string>
+#include <chrono>
 
+namespace {
+
+class stack_printer
+{
+public:
+    explicit stack_printer(const char* msg) :
+        m_msg(msg)
+    {
+        std::cout << m_msg << ": --begin" << std::endl;
+        m_start_time = get_time();
+    }
+
+    ~stack_printer()
+    {
+        double end_time = get_time();
+        std::cout << m_msg << ": --end (duration: " << (end_time-m_start_time) << " sec)" << std::endl;
+    }
+
+    void print_time(int line) const
+    {
+        double end_time = get_time();
+        std::cout << m_msg << ": --(" << line << ") (duration: " << (end_time-m_start_time) << " sec)" << std::endl;
+    }
+
+private:
+    double get_time() const
+    {
+        unsigned long usec_since_epoch =
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+
+        return usec_since_epoch / 1000000.0;
+    }
+
+    std::string m_msg;
+    double m_start_time;
+};
+
+}
 //          Redraw - Notifications
 
 void ScDocShell::PostEditView( ScEditEngineDefaulter* pEditEngine, const ScAddress& rCursorPos )
@@ -92,9 +134,11 @@ void ScDocShell::PostEditView( ScEditEngineDefaulter* pEditEngine, const ScAddre
 
 void ScDocShell::PostDataChanged()
 {
+    stack_printer __stack_printer__("ScDocShell::PostDataChanged");
     Broadcast( SfxHint( SfxHintId::ScDataChanged ) );
     SfxGetpApp()->Broadcast(SfxHint( SfxHintId::ScAnyDataChanged ));      // Navigator
     m_pDocument->PrepareFormulaCalc();
+    m_pDocument->DumpBroadcasterState();
     //! notify navigator directly!
 }
 

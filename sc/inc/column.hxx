@@ -864,6 +864,8 @@ private:
 
     void EndListeningGroup( sc::EndListeningContext& rCxt, SCROW nRow );
     void SetNeedsListeningGroup( SCROW nRow );
+
+    void DumpBroadcasterState() const;
 };
 
 inline bool ScColumn::IsEmptyAttr() const

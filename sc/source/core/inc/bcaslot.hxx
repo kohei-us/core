@@ -233,6 +233,8 @@ public:
         const ScRange& rRange, std::vector<sc::AreaListener>& rListeners,
         sc::AreaOverlapType eType, sc::ListenerGroupType eGroup );
 
+    void DumpBroadcasterState() const;
+
 #if DEBUG_AREA_BROADCASTER
     void Dump() const;
 #endif
@@ -363,6 +365,8 @@ public:
     std::vector<sc::AreaListener> GetAllListeners(
         const ScRange& rRange, sc::AreaOverlapType eType,
         sc::ListenerGroupType eGroup = sc::ListenerGroupType::Both );
+
+    void DumpBroadcasterState() const;
 
 #if DEBUG_AREA_BROADCASTER
     void Dump() const;

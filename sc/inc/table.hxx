@@ -1156,6 +1156,8 @@ public:
 
     void CheckIntegrity() const;
 
+    void DumpBroadcasterState() const;
+
 private:
 
     void FillFormulaVertical(

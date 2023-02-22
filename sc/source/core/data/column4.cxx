@@ -2233,4 +2233,34 @@ void ScColumn::CheckIntegrity() const
     }
 }
 
+void ScColumn::DumpBroadcasterState() const
+{
+    constexpr ScRefFlags nPosFlags = ScRefFlags::VALID | ScRefFlags::TAB_3D;
+
+    for (const auto& block : maBroadcasters)
+    {
+        if (block.type != sc::element_type_broadcaster)
+            continue;
+
+        auto itBeg = sc::broadcaster_block::begin(*block.data);
+        auto itEnd = sc::broadcaster_block::end(*block.data);
+
+        for (auto it = itBeg; it != itEnd; ++it)
+        {
+            ScAddress aBCPos(nCol, block.position + std::distance(itBeg, it), nTab);
+            std::cout << "* broadcaster: (" << aBCPos.Format(nPosFlags, &GetDoc()) << ")" << std::endl;
+
+            const SvtBroadcaster& rBC = **it;
+            for (const SvtListener* pLis : rBC.GetAllListeners())
+            {
+                const auto* pFC = dynamic_cast<const ScFormulaCell*>(pLis);
+                if (pFC)
+                {
+                    std::cout << "  * listener: formula cell (" << pFC->aPos.Format(nPosFlags, &GetDoc()) << ")" << std::endl;
+                }
+            }
+        }
+    }
+}
+
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

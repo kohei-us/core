@@ -2368,6 +2368,8 @@ public:
 
     void EndListeningFormulaCells( std::vector<ScFormulaCell*>& rCells );
 
+    void DumpBroadcasterState() const;
+
     void                PutInFormulaTree( ScFormulaCell* pCell );
     void                RemoveFromFormulaTree( ScFormulaCell* pCell );
 

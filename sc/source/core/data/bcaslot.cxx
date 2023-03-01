@@ -31,6 +31,7 @@
 #include <columnspanset.hxx>
 #include <formulacell.hxx>
 #include <grouparealistener.hxx>
+#include <broadcast.hxx>
 
 ScBroadcastArea::ScBroadcastArea( const ScRange& rRange ) :
     pUpdateChainNext(nullptr),
@@ -493,6 +494,41 @@ void ScBroadcastAreaSlot::GetAllListeners(
             aEntry.mbGroupListening = pArea->IsGroupListening();
             aEntry.mpListener = pListener;
             rListeners.push_back(aEntry);
+        }
+    }
+}
+
+void ScBroadcastAreaSlot::CollectBroadcasterState(sc::BroadcasterState& rState) const
+{
+    (void)rState;
+
+    for (const ScBroadcastAreaEntry& rEntry : aBroadcastAreaTbl)
+    {
+        const ScRange& rRange = rEntry.mpArea->GetRange();
+        bool bGroupListener = rEntry.mpArea->IsGroupListening();
+        (void)rRange;
+        (void)bGroupListener;
+
+        for (const SvtListener* pLis : rEntry.mpArea->GetBroadcaster().GetAllListeners())
+        {
+            if (auto pFC = dynamic_cast<const ScFormulaCell*>(pLis); pFC)
+            {
+                (void)pFC;
+                continue;
+            }
+
+            if (auto pFGL = dynamic_cast<const sc::FormulaGroupAreaListener*>(pLis); pFGL)
+            {
+                auto pTopCell = pFGL->getTopCell();
+                if (auto xFG = pTopCell->GetCellGroup(); xFG)
+                {
+                    ScRange aGR(pTopCell->aPos);
+                    aGR.aEnd.IncRow(xFG->mnLength - 1);
+                    (void)aGR;
+                }
+
+                continue;
+            }
         }
     }
 }
@@ -1315,6 +1351,20 @@ std::vector<sc::AreaListener> ScBroadcastAreaSlotMachine::GetAllListeners(
     }
 
     return aRet;
+}
+
+void ScBroadcastAreaSlotMachine::CollectBroadcasterState(sc::BroadcasterState& rState) const
+{
+    for (const auto& [_, rTabSlots] : aTableSlotsMap)
+    {
+        ScBroadcastAreaSlot** pp = rTabSlots.getSlots();
+        for (SCSIZE i = 0; i < mnBcaSlots; ++i)
+        {
+            const ScBroadcastAreaSlot* pSlot = pp[i];
+            if (pSlot)
+                pSlot->CollectBroadcasterState(rState);
+        }
+    }
 }
 
 void ScBroadcastAreaSlotMachine::DumpBroadcasterState() const

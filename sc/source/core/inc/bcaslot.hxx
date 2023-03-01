@@ -30,7 +30,12 @@
 #include <document.hxx>
 #include <global.hxx>
 
-namespace sc { class ColumnSpanSet; }
+namespace sc {
+
+struct BroadcasterState;
+class ColumnSpanSet;
+
+}
 class ScHint;
 
 namespace sc {
@@ -233,6 +238,7 @@ public:
         const ScRange& rRange, std::vector<sc::AreaListener>& rListeners,
         sc::AreaOverlapType eType, sc::ListenerGroupType eGroup );
 
+    void CollectBroadcasterState(sc::BroadcasterState& rState) const;
     void DumpBroadcasterState() const;
 
 #if DEBUG_AREA_BROADCASTER
@@ -366,6 +372,7 @@ public:
         const ScRange& rRange, sc::AreaOverlapType eType,
         sc::ListenerGroupType eGroup = sc::ListenerGroupType::Both );
 
+    void CollectBroadcasterState(sc::BroadcasterState& rState) const;
     void DumpBroadcasterState() const;
 
 #if DEBUG_AREA_BROADCASTER

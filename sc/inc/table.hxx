@@ -57,6 +57,7 @@ namespace com::sun::star {
 namespace formula { struct VectorRefArray; }
 namespace sc {
 
+struct BroadcasterState;
 class StartListeningContext;
 class EndListeningContext;
 class CopyFromClipContext;
@@ -1156,6 +1157,7 @@ public:
 
     void CheckIntegrity() const;
 
+    void CollectBroadcasterState(sc::BroadcasterState& rState) const;
     void DumpBroadcasterState() const;
 
 private:

@@ -70,6 +70,7 @@
 #include <markdata.hxx>
 #include <memory>
 #include <formulaopt.hxx>
+#include <broadcast.hxx>
 
 #include <comphelper/lok.hxx>
 #include <sfx2/lokhelper.hxx>
@@ -139,6 +140,9 @@ void ScDocShell::PostDataChanged()
     SfxGetpApp()->Broadcast(SfxHint( SfxHintId::ScAnyDataChanged ));      // Navigator
     m_pDocument->PrepareFormulaCalc();
     m_pDocument->DumpBroadcasterState();
+    auto aState = m_pDocument->GetBroadcasterState();
+    aState.dump(std::cout, m_pDocument.get());
+
     //! notify navigator directly!
 }
 

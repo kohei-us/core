@@ -77,6 +77,7 @@ namespace tools { class Guid; }
 
 namespace sc {
 
+struct BroadcasterState;
 struct FormulaGroupContext;
 class StartListeningContext;
 class EndListeningContext;
@@ -2368,6 +2369,7 @@ public:
 
     void EndListeningFormulaCells( std::vector<ScFormulaCell*>& rCells );
 
+    sc::BroadcasterState GetBroadcasterState() const;
     void DumpBroadcasterState() const;
 
     void                PutInFormulaTree( ScFormulaCell* pCell );

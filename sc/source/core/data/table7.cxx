@@ -649,6 +649,12 @@ void ScTable::CheckIntegrity() const
         pCol->CheckIntegrity();
 }
 
+void ScTable::CollectBroadcasterState(sc::BroadcasterState& rState) const
+{
+    for (const auto& pCol : aCol)
+        pCol->CollectBroadcasterState(rState);
+}
+
 void ScTable::DumpBroadcasterState() const
 {
     for (const auto& pCol : aCol)

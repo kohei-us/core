@@ -24,6 +24,7 @@
 #include <orcus/orcus_xlsx.hpp>
 #include <orcus/orcus_xls_xml.hpp>
 #include <orcus/orcus_ods.hpp>
+#include <orcus/orcus_parquet.hpp>
 #include <orcus/orcus_import_ods.hpp>
 #include <orcus/stream.hpp>
 #include <com/sun/star/task/XStatusIndicator.hpp>
@@ -85,6 +86,15 @@ bool ScOrcusFiltersImpl::importGnumeric(ScDocument& rDoc, SfxMedium& rMedium) co
     aFactory.setStatusIndicator(getStatusIndicator(rMedium));
 
     orcus::orcus_gnumeric filter(&aFactory);
+    return loadFileContent(rMedium, filter);
+}
+
+bool ScOrcusFiltersImpl::importParquet(ScDocument& rDoc, SfxMedium& rMedium) const
+{
+    ScOrcusFactory aFactory(rDoc);
+    aFactory.setStatusIndicator(getStatusIndicator(rMedium));
+
+    orcus::orcus_parquet filter(&aFactory);
     return loadFileContent(rMedium, filter);
 }
 

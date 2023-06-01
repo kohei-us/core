@@ -1280,6 +1280,14 @@ bool ScDocShell::ConvertFrom( SfxMedium& rMedium )
 
             bRet = pOrcus->importExcel2003XML(*m_pDocument, rMedium);
         }
+        else if (aFltName == "Apache Parquet Spreadsheet")
+        {
+            ScOrcusFilters* pOrcus = ScFormatFilter::Get().GetOrcusFilters();
+            if (!pOrcus)
+                return false;
+
+            bRet = pOrcus->importParquet(*m_pDocument, rMedium);
+        }
         else if (aFltName == SC_TEXT_CSV_FILTER_NAME)
         {
             ScAsciiOptions aOptions;

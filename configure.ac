@@ -5646,6 +5646,13 @@ else
     AC_MSG_RESULT([no])
 fi
 
+AC_CHECK_PROG(CMAKE, cmake, cmake, [])
+if test -z "$CMAKE"; then
+    AC_MSG_ERROR([cmake is required but not found. Please install cmake.])
+fi
+
+AC_SUBST(CMAKE)
+
 AC_MSG_CHECKING([whether to enable xapian-omega support for online help])
 if test -n "$with_omindex" -a "$with_omindex" != "no"; then
     if test "$HELP_ONLINE" != TRUE; then

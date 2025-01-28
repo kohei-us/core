@@ -11040,7 +11040,7 @@ dnl ===================================================================
 dnl Check for system mdds
 dnl ===================================================================
 MDDS_CFLAGS_internal="-I${WORKDIR}/UnpackedTarball/mdds/include"
-libo_CHECK_SYSTEM_MODULE([mdds],[MDDS],[mdds-2.1 >= 2.1.0])
+libo_CHECK_SYSTEM_MODULE([mdds],[MDDS],[mdds-3.0 >= 3.0.0])
 
 dnl ===================================================================
 dnl Check for system dragonbox

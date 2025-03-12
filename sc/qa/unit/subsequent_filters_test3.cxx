@@ -12,6 +12,7 @@
 
 #include <sfx2/docfile.hxx>
 
+#include <svl/sharedstringpool.hxx>
 #include <svx/svdpage.hxx>
 #include <svx/svdocapt.hxx>
 #include <svx/svdoole2.hxx>
@@ -36,6 +37,7 @@
 #include <tabvwsh.hxx>
 #include <scresid.hxx>
 #include <globstr.hrc>
+#include <queryparam.hxx>
 
 #include <com/sun/star/drawing/FillStyle.hpp>
 #include <com/sun/star/drawing/XDrawPageSupplier.hpp>
@@ -272,6 +274,67 @@ CPPUNIT_TEST_FIXTURE(ScFiltersTest3, testWrapAndShrinkXLSXML)
         const ScShrinkToFitCell* pSTF = pDoc->GetAttr(rC.nCol, rC.nRow, 0, ATTR_SHRINKTOFIT);
         CPPUNIT_ASSERT_EQUAL(pSTF->GetValue(), rC.bShrinkToFit);
     }
+}
+
+CPPUNIT_TEST_FIXTURE(ScFiltersTest3, testAutofilterTextXLSXML)
+//void foo()
+{
+    createScDoc("xml/autofilter-text.xml");
+    ScDocument* pDoc = getScDoc();
+
+    auto aNames = pDoc->GetAllTableNames();
+    CPPUNIT_ASSERT_EQUAL(std::size_t(6), aNames.size());
+    CPPUNIT_ASSERT_EQUAL(u"Equals"_ustr, aNames[0]);
+    CPPUNIT_ASSERT_EQUAL(u"Does Not Equal"_ustr, aNames[1]);
+    CPPUNIT_ASSERT_EQUAL(u"Begins With"_ustr, aNames[2]);
+    CPPUNIT_ASSERT_EQUAL(u"Ends With"_ustr, aNames[3]);
+    CPPUNIT_ASSERT_EQUAL(u"Contains"_ustr, aNames[4]);
+    CPPUNIT_ASSERT_EQUAL(u"Does Not Contain"_ustr, aNames[5]);
+
+    ScDBData* pData = pDoc->GetAnonymousDBData(0);
+    CPPUNIT_ASSERT(pData);
+    ScRange aFilterRange;
+    pData->GetArea(aFilterRange);
+
+    CPPUNIT_ASSERT_EQUAL(ScRange(1, 2, 0, 6, 95, 0), aFilterRange); // B3:G96
+    CPPUNIT_ASSERT(pData->HasAutoFilter());
+
+    ScQueryParam aQueryParam;
+    pData->GetQueryParam(aQueryParam);
+    CPPUNIT_ASSERT(aQueryParam.bHasHeader);
+    CPPUNIT_ASSERT(aQueryParam.bByRow);
+
+    auto aEntries = aQueryParam.FindAllEntriesByField(2);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), aEntries.size());
+
+    {
+        const ScQueryEntry& rEntry = aQueryParam.GetEntry(0);
+        CPPUNIT_ASSERT(rEntry.bDoQuery);
+        CPPUNIT_ASSERT_EQUAL(SCCOLROW(2), rEntry.nField);
+        CPPUNIT_ASSERT_EQUAL(SC_EQUAL, rEntry.eOp);
+        CPPUNIT_ASSERT_EQUAL(rEntry.GetQueryItem().meType, ScQueryEntry::ByString);
+
+        svl::SharedString aSStr = pDoc->GetSharedStringPool().intern(u"Japan"_ustr);
+        CPPUNIT_ASSERT_EQUAL(aSStr.getString(), rEntry.GetQueryItem().maString.getString());
+        CPPUNIT_ASSERT_EQUAL(aSStr.getIgnoreCaseString(),
+                             rEntry.GetQueryItem().maString.getIgnoreCaseString());
+    }
+
+    {
+        const ScQueryEntry& rEntry = aQueryParam.GetEntry(1);
+        CPPUNIT_ASSERT(rEntry.bDoQuery);
+        CPPUNIT_ASSERT_EQUAL(SCCOLROW(2), rEntry.nField);
+        CPPUNIT_ASSERT_EQUAL(SC_EQUAL, rEntry.eOp);
+        CPPUNIT_ASSERT_EQUAL(SC_OR, rEntry.eConnect);
+        CPPUNIT_ASSERT_EQUAL(rEntry.GetQueryItem().meType, ScQueryEntry::ByString);
+
+        svl::SharedString aSStr = pDoc->GetSharedStringPool().intern(u"China"_ustr);
+        CPPUNIT_ASSERT_EQUAL(aSStr.getString(), rEntry.GetQueryItem().maString.getString());
+        CPPUNIT_ASSERT_EQUAL(aSStr.getIgnoreCaseString(),
+                             rEntry.GetQueryItem().maString.getIgnoreCaseString());
+    }
+
+    // TODO: continue...
 }
 
 CPPUNIT_TEST_FIXTURE(ScFiltersTest3, testCondFormatXLSB)

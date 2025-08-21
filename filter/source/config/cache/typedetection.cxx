@@ -263,6 +263,7 @@ int getFlatTypeRank(std::u16string_view rType)
         "XHTML_File",
         "svg_Scalable_Vector_Graphics",
         "math_MathML_XML_Math",
+        "generic_XML",
 
         // Non-compressed text
         "dxf_AutoCAD_Interchange",
@@ -275,6 +276,7 @@ int getFlatTypeRank(std::u16string_view rType)
         "writer_Rich_Text_Format",
         "writer_web_HTML_help",
         "generic_HTML",
+        "generic_JSON",
         "generic_Markdown",
 
         "generic_Text", // Plain text (catch all)
